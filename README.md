@@ -33,8 +33,8 @@ code quality, modularity, and domain-driven design.
 
 ## Features
 
-- Import and parse transactions from CSV files for multiple banks.
-- Automatically or manually categorize transactions.
+- Import and parse financialRecords from CSV files for multiple banks.
+- Automatically or manually categorize financialRecords.
 - Track your spending by day, week, month, and year.
 - Extensible CSV parser support for different banks (open for community contribution).
 - Clean and modular design using Hexagonal Architecture (Ports and Adapters).
@@ -59,7 +59,7 @@ business logic, infrastructure, and user interfaces.
 com.moneymind
   ├── domain          // Core business entities and logic
   ├── adapters         // Adapters like database repositories, CSV parsers, etc.
-  ├──── in.web         // REST API for interacting with the system, allowing users to import transactions, categorize them, and view analytics.
+  ├──── in.web         // REST API for interacting with the system, allowing users to import financialRecords, categorize them, and view analytics.
   ├──── out.postgres   // Manages database persistence (PostgreSQL).
   ├── application     // Service implementations in the form of use cases, parser logic
   ├──── ports     // ports for the application
@@ -69,22 +69,22 @@ com.moneymind
 ## Functional Requirements
 
 1. **Import Transactions from CSV Files**
-    - Upload and parse CSV files containing bank transactions.
+    - Upload and parse CSV files containing bank `financialRecords`.
     - Support for multiple bank formats (with extendable parser support).
 
 2. **List All Transactions**
-    - Retrieve a list of all transactions, filtered by date range, category, or bank.
+    - Retrieve a list of all `financialRecords`, filtered by date range, category, or bank.
 
 3. **Add Single Expense**
     - Manually add individual expenses not captured by CSV imports.
 
 4. **Categorize Transactions**
-    - Assign categories to transactions manually or through an automated categorization process.
+    - Assign categories to `financialRecords` manually or through an automated categorization process.
     - Auto-categorization improves over time based on user input (rule-based learning).
 
 5. **Summarize Spending**
     - Display total spending for specific periods (daily, weekly, monthly, yearly).
-    - View spending breakdowns by category and transaction source (bank).
+    - View spending breakdowns by category and `financialRecord` source (bank).
 
 6. **Extensible Parser Contributions**
     - Public API for third-party contributors to create and submit parsers for new banks.
@@ -99,7 +99,7 @@ Before you begin, ensure you have the following installed:
 
 - **Java 11+**: Required to run the Quarkus application.
 - **Maven**: To manage dependencies and build the project.
-- **PostgreSQL**: The database used for storing transactions.
+- **PostgreSQL**: The database used for storing `bank_transactions`.
 - **Docker** (optional): For running PostgreSQL in a containerized environment.
 
 ### Installation
@@ -140,7 +140,7 @@ Below are some of the core API endpoints available for interaction:
   Retrieve all transactions, with optional filters like date range or category.
 
 - **POST** `/transactions/{id}/categorize`:  
-  Categorize a specific transaction by its ID.
+  Categorize a specific transactions by its ID.
 
 - **GET** `/transactions/summary`:  
   Retrieve a summary of total spending for a given time period.

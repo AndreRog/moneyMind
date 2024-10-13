@@ -7,7 +7,7 @@
 
     <properties>
         <compiler-plugin.version>3.13.0</compiler-plugin.version>
-        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
@@ -15,6 +15,10 @@
         <quarkus.platform.version>3.15.1</quarkus.platform.version>
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.3.1</surefire-plugin.version>
+        <jooq.version>2.0.0</jooq.version>
+        <org.jooq.version>3.18.7</org.jooq.version>
+        <jooq.codegen.sabomichal.version>1.1.1</jooq.codegen.sabomichal.version>
+
     </properties>
 
     <dependencyManagement>
@@ -38,6 +42,32 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-arc</artifactId>
         </dependency>
+
+        <!-- Flyway specific dependencies -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-flyway</artifactId>
+        </dependency>
+
+        <!-- JDBC driver dependencies -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-postgresql</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.quarkiverse.jooq</groupId>
+            <artifactId>quarkus-jooq</artifactId>
+            <version>${jooq.version}</version>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.apache.poi/poi-ooxml -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.3</version>
+        </dependency>
+
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit5</artifactId>
@@ -47,6 +77,47 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.jooq</groupId>
+                <artifactId>jooq-codegen-maven</artifactId>
+                <version>${org.jooq.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.github.sabomichal</groupId>
+                        <artifactId>jooq-meta-postgres-flyway</artifactId>
+                        <version>${jooq.codegen.sabomichal.version}</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <id>jooq-codegen</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <generator>
+                                <database>
+                                    <name>com.github.sabomichal.jooq.PostgresDDLDatabase</name>
+                                    <properties>
+                                        <property>
+                                            <key>dockerImage</key>
+                                            <value>postgres:15.4</value>
+                                        </property>
+                                        <property>
+                                            <key>locations</key>
+                                            <value>src/main/resources/db/migration</value>
+                                        </property>
+                                    </properties>
+                                    <includes>public.*</includes>
+                                    <excludes>flyway_schema_history</excludes>
+                                    <inputSchema>public</inputSchema>
+                                </database>
+                            </generator>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
@@ -114,6 +185,54 @@
                 <skipITs>false</skipITs>
                 <quarkus.native.enabled>true</quarkus.native.enabled>
             </properties>
+        </profile>
+        <profile>
+            <id>jooq</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jooq</groupId>
+                        <artifactId>jooq-codegen-maven</artifactId>
+                        <version>${org.jooq.version}</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.github.sabomichal</groupId>
+                                <artifactId>jooq-meta-postgres-flyway</artifactId>
+                                <version>${jooq.codegen.sabomichal.version}</version>
+                            </dependency>
+                        </dependencies>
+                        <executions>
+                            <execution>
+                                <id>jooq-codegen</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>generate</goal>
+                                </goals>
+                                <configuration>
+                                    <generator>
+                                        <database>
+                                            <name>com.github.sabomichal.jooq.PostgresDDLDatabase</name>
+                                            <properties>
+                                                <property>
+                                                    <key>dockerImage</key>
+                                                    <value>postgres:15.4</value>
+                                                </property>
+                                                <property>
+                                                    <key>locations</key>
+                                                    <value>src/main/resources/db/migration</value>
+                                                </property>
+                                            </properties>
+                                            <includes>public.*</includes>
+                                            <excludes>flyway_schema_history</excludes>
+                                            <inputSchema>public</inputSchema>
+                                        </database>
+                                    </generator>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 </project>
