@@ -1,9 +1,3 @@
-Here's a well-structured and professional **README** file for your **MoneyMind** project. This version highlights 
-important details that will resonate well with reviewers in the challenge, emphasizing your use of Quarkus, PostgreSQL, 
-and clean architecture principles. It also includes a **Functional Requirements** section as you suggested.
-
----
-
 # MoneyMind
 
 MoneyMind is a personal finance management application that helps users import, categorize, and track bank transactions 
@@ -26,8 +20,7 @@ code quality, modularity, and domain-driven design.
     - [Installation](#installation)
     - [Running the Application](#running-the-application)
 - [API Endpoints](#api-endpoints)
-- [Contributing](#contributing)
-- [License](#license)
+
 
 ---
 
@@ -131,16 +124,4 @@ The application will be running at `http://localhost:8080`.
 
 ## API Endpoints
 
-Below are some of the core API endpoints available for interaction:
-
-- **POST** `/transactions/import`:  
-  Upload a CSV file containing bank transactions for import.
-
-- **GET** `/transactions`:  
-  Retrieve all transactions, with optional filters like date range or category.
-
-- **POST** `/transactions/{id}/categorize`:  
-  Categorize a specific transactions by its ID.
-
-- **GET** `/transactions/summary`:  
-  Retrieve a summary of total spending for a given time period.
+Check `/docs/moneymind.yaml`
