@@ -4,6 +4,7 @@ import com.adapters.out.postgres.TransactionStore;
 import com.app.domain.banks.ListBanks;
 import com.app.domain.transactions.ImportTransactions;
 import com.app.domain.transactions.SearchTransactions;
+import com.app.domain.transactions.UpdateTransactions;
 import com.app.parsers.TransactionsParserFactory;
 import com.app.ports.TransactionRepository;
 import com.app.ports.TransactionsParser;
@@ -45,6 +46,12 @@ public class DI {
     @Produces
     SearchTransactions listBankTransactions(final TransactionRepository transactionRepository) {
         return new SearchTransactions(transactionRepository);
+    }
+
+    @ApplicationScoped
+    @Produces
+    UpdateTransactions updateTransactions(final TransactionRepository transactionRepository) {
+        return new UpdateTransactions(transactionRepository);
     }
 
     @ApplicationScoped

@@ -1,11 +1,13 @@
 package com.adapters.in.web.http;
 
+import com.adapters.in.web.http.dto.UpdateCategoryRequest;
 import com.adapters.in.web.http.hateoas.Link;
 import com.app.domain.SearchResponse;
 import com.app.domain.banks.ListBanks;
 import com.app.domain.transactions.ImportTransactions;
 import com.app.domain.transactions.SearchTransactions;
 import com.app.domain.core.FinancialRecord;
+import com.app.domain.transactions.UpdateTransactions;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
@@ -25,11 +27,13 @@ public class TransactionsResource {
 
     private final ImportTransactions importTransactions;
     private final SearchTransactions searchTransactions;
+    private final UpdateTransactions updateTransactions;
 
     public TransactionsResource(ImportTransactions importTransactions, SearchTransactions searchTransactions,
-                                ListBanks listBanks) {
+                                UpdateTransactions updateTransactions) {
         this.importTransactions = importTransactions;
         this.searchTransactions = searchTransactions;
+        this.updateTransactions = updateTransactions;
     }
 
 
@@ -46,49 +50,65 @@ public class TransactionsResource {
     @GET
     @Path("/search")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response search(@Context UriInfo uriInfo,
-                         @QueryParam("id") String transactionId,
-                         @QueryParam("category") String category,
-                         @QueryParam("bank") String bank,
-                         @QueryParam("from") String from,
-                         @QueryParam("to") String to,
-                         @QueryParam("limit") int limit,
-                         @QueryParam("cursor") String cursor
-    ) throws IOException, URISyntaxException {
+    public Response search(
+            @Context UriInfo uriInfo,
+            @QueryParam("id") String transactionId,
+            @QueryParam("category") String category,
+            @QueryParam("bank") String bank,
+            @QueryParam("from") String from,
+            @QueryParam("to") String to,
+            @QueryParam("limit") int limit,
+            @QueryParam("cursor") String cursor
+    ) {
         final SearchResponse<FinancialRecord> searchResponse = this.searchTransactions.execute(
-                transactionId, category,bank,from,to,limit,cursor
+                transactionId, category, bank, from, to, limit, cursor
         );
-
 
         return Response.ok(toPageResponse(searchResponse, uriInfo, transactionId, category, bank, from, to, cursor)).build();
     }
 
+    @PUT
+    @Path("/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response updateTransaction(@PathParam("id") String id,
+                                      UpdateCategoryRequest updateCategoryRequest) {
+        final FinancialRecord record = this.updateTransactions.execute(id, updateCategoryRequest.category());
+
+        if(record == null) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+
+        return Response.ok(record).build();
+    }
+
+
     private Page<FinancialRecord> toPageResponse(SearchResponse<FinancialRecord> searchResponse, UriInfo uriInfo,
                                                  String transactionId, String category, String bank,
-                                                 String from, String to, String cursor) throws URISyntaxException {
+                                                 String from, String to, String cursor) {
         Map<String, String> parameters = new HashMap<>();
 
         // previous only if not first page
         String previous = uriInfo.getRequestUri().toString();
-        if(cursor == null || cursor.isBlank()) {
+        if (cursor == null || cursor.isBlank()) {
             previous = "";
         }
 
-        if(transactionId != null && transactionId.isBlank()){
+        if (transactionId != null && transactionId.isBlank()) {
             parameters.put("transactionId", transactionId);
         }
 
-        if(category != null && category.isBlank()){
+        if (category != null && category.isBlank()) {
             parameters.put("category", category);
         }
-        if(bank != null && bank.isBlank()){
+        if (bank != null && bank.isBlank()) {
             parameters.put("bank", bank);
         }
-        if(from != null && from.isBlank()){
+        if (from != null && from.isBlank()) {
             parameters.put("from", from);
         }
 
-        if(to != null && to.isBlank()){
+        if (to != null && to.isBlank()) {
             parameters.put("to", to);
         }
 

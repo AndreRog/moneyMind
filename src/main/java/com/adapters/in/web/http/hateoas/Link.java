@@ -4,14 +4,13 @@ import com.app.domain.SearchResponse;
 import jakarta.ws.rs.core.UriBuilder;
 import jakarta.ws.rs.core.UriInfo;
 
-import java.net.URISyntaxException;
 import java.util.Map;
 
 public record Link(String href) {
     public static <T> Link buildNextLink (
         SearchResponse<T> searchResponse,
         UriInfo uriInfo,
-        Map<String, String> extraQueryParams) throws URISyntaxException {
+        Map<String, String> extraQueryParams) {
 
         UriBuilder builder = UriBuilder.fromUri(uriInfo.getAbsolutePath());
 

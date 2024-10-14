@@ -142,4 +142,25 @@ public class TransactionStore extends Store implements TransactionRepository  {
                 newCursor
         );
     }
+
+    @Override
+    public void update(final UUID id, final String category) {
+        this.dataSource.update(BankTransaction.BANK_TRANSACTION)
+                .set(BankTransaction.BANK_TRANSACTION.CATEGORY, category)
+                .where(BankTransaction.BANK_TRANSACTION.UUID.eq(id))
+                .execute();
+    }
+
+    @Override
+    public FinancialRecord getById(UUID id) {
+        List<BankTransactionRecord> transactionRecord =  this.dataSource.selectFrom(BankTransaction.BANK_TRANSACTION)
+                .where(BankTransaction.BANK_TRANSACTION.UUID.eq(id))
+                .fetchInto(BankTransactionRecord.class);
+
+        if(transactionRecord.isEmpty()) {
+            return null;
+        }
+
+        return toModel(transactionRecord.get(0));
+    }
 }
