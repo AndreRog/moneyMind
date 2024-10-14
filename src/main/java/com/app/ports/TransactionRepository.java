@@ -1,5 +1,6 @@
 package com.app.ports;
 
+import com.app.domain.SearchResponse;
 import com.app.domain.core.FinancialRecord;
 
 import java.util.List;
@@ -10,5 +11,6 @@ public interface TransactionRepository {
 
     void insertTransactions(final List<FinancialRecord> financialRecords);
 
-    List<FinancialRecord> list();
+    SearchResponse<FinancialRecord> search(String id, String category, String bank, String from,
+                                           String to, int limit, String cursor);
 }

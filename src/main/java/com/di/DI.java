@@ -3,7 +3,7 @@ package com.di;
 import com.adapters.out.postgres.TransactionStore;
 import com.app.domain.banks.ListBanks;
 import com.app.domain.transactions.ImportTransactions;
-import com.app.domain.transactions.ListTransactions;
+import com.app.domain.transactions.SearchTransactions;
 import com.app.parsers.TransactionsParserFactory;
 import com.app.ports.TransactionRepository;
 import com.app.ports.TransactionsParser;
@@ -43,8 +43,8 @@ public class DI {
 
     @ApplicationScoped
     @Produces
-    ListTransactions listBankTransactions(final TransactionRepository transactionRepository) {
-        return new ListTransactions(transactionRepository);
+    SearchTransactions listBankTransactions(final TransactionRepository transactionRepository) {
+        return new SearchTransactions(transactionRepository);
     }
 
     @ApplicationScoped

@@ -1,7 +1,8 @@
 package com.adapters.in.web.http;
 
-import jakarta.ws.rs.core.Link;
+
+import com.adapters.in.web.http.hateoas.Link;
 
 import java.util.List;
 
-public record Page<T> (Link next, Link previous, List<T> items){}
+public record Page<T> (Link next, Link previous, List<T> _embedded){}
