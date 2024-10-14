@@ -1,11 +1,14 @@
 package com.di;
 
 import com.adapters.out.postgres.TransactionStore;
+import com.adapters.out.txClassifier.ClassificationEngine;
 import com.app.domain.banks.ListBanks;
+import com.app.domain.transactions.ClassifyTransactions;
 import com.app.domain.transactions.ImportTransactions;
 import com.app.domain.transactions.SearchTransactions;
 import com.app.domain.transactions.UpdateTransactions;
 import com.app.parsers.TransactionsParserFactory;
+import com.app.ports.TransactionClassifier;
 import com.app.ports.TransactionRepository;
 import com.app.ports.TransactionsParser;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -58,6 +61,19 @@ public class DI {
     @Produces
     ListBanks listBanks(final TransactionsParserFactory transactionsParserFactory) {
         return new ListBanks(transactionsParserFactory);
+    }
+
+    @ApplicationScoped
+    @Produces
+    TransactionClassifier transactionClassifier( ) {
+        return new ClassificationEngine();
+    }
+
+    @ApplicationScoped
+    @Produces
+    ClassifyTransactions classifyTransactions( final TransactionClassifier transactionClassifier,
+                                               final TransactionRepository transactionRepository ) {
+        return new ClassifyTransactions(transactionClassifier, transactionRepository);
     }
 
 }

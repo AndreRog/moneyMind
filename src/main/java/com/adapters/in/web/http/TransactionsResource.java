@@ -4,6 +4,7 @@ import com.adapters.in.web.http.dto.UpdateCategoryRequest;
 import com.adapters.in.web.http.hateoas.Link;
 import com.app.domain.SearchResponse;
 import com.app.domain.banks.ListBanks;
+import com.app.domain.transactions.ClassifyTransactions;
 import com.app.domain.transactions.ImportTransactions;
 import com.app.domain.transactions.SearchTransactions;
 import com.app.domain.core.FinancialRecord;
@@ -21,6 +22,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Path("/transactions")
 public class TransactionsResource {
@@ -28,12 +30,15 @@ public class TransactionsResource {
     private final ImportTransactions importTransactions;
     private final SearchTransactions searchTransactions;
     private final UpdateTransactions updateTransactions;
+    private final ClassifyTransactions classifyTransactions;
 
     public TransactionsResource(ImportTransactions importTransactions, SearchTransactions searchTransactions,
-                                UpdateTransactions updateTransactions) {
+                                UpdateTransactions updateTransactions, ClassifyTransactions classifyTransactions) {
         this.importTransactions = importTransactions;
         this.searchTransactions = searchTransactions;
         this.updateTransactions = updateTransactions;
+        this.classifyTransactions = classifyTransactions;
+
     }
 
 
@@ -80,6 +85,14 @@ public class TransactionsResource {
         }
 
         return Response.ok(record).build();
+    }
+
+    @PUT
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response classifyTransaction() {
+        CompletableFuture<Void> classifyTask = this.classifyTransactions.execute();
+        return Response.accepted().build();
     }
 
 
