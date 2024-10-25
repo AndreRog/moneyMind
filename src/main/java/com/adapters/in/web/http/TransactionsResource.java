@@ -3,7 +3,6 @@ package com.adapters.in.web.http;
 import com.adapters.in.web.http.dto.UpdateCategoryRequest;
 import com.adapters.in.web.http.hateoas.Link;
 import com.app.domain.SearchResponse;
-import com.app.domain.banks.ListBanks;
 import com.app.domain.transactions.ClassifyTransactions;
 import com.app.domain.transactions.ImportTransactions;
 import com.app.domain.transactions.SearchTransactions;
@@ -18,8 +17,6 @@ import org.jboss.resteasy.reactive.RestForm;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;

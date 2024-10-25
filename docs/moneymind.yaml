@@ -1,0 +1,203 @@
+openapi: 3.0.2
+info:
+  title: MoneyMind API
+  version: 1.0.0
+  description: |
+    The MoneyMind API allows users to import transactions from various banks, search, update categories, and classify transactions.
+    Additionally, it provides a list of supported banks for importing transactions.
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+paths:
+  /transactions/import:
+    post:
+      summary: Import bank transactions
+      description: Upload a bank transaction file and import the transactions.
+      operationId: importTransactions
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  description: The bank type (used to identify the parser)
+                file:
+                  type: string
+                  format: binary
+                  description: The transaction file to be uploaded
+      responses:
+        '204':
+          description: Transactions successfully imported
+        '400':
+          description: Invalid request parameters
+        '500':
+          description: Server error during file processing
+
+  /transactions/search:
+    get:
+      summary: Search transactions
+      description: Search transactions based on transaction ID, category, bank, and date range.
+      operationId: searchTransactions
+      parameters:
+        - name: id
+          in: query
+          description: Transaction ID to search
+          schema:
+            type: string
+        - name: category
+          in: query
+          description: Category of the transactions
+          schema:
+            type: string
+        - name: bank
+          in: query
+          description: Bank name or type
+          schema:
+            type: string
+        - name: from
+          in: query
+          description: Start date (yyyy-MM-dd)
+          schema:
+            type: string
+        - name: to
+          in: query
+          description: End date (yyyy-MM-dd)
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum number of transactions to return
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          description: Cursor for pagination
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful search
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  next:
+                    type: string
+                    description: URL to next page
+                  prev:
+                    type: string
+                    description: URL to previous page
+                  _embedded:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FinancialRecord'
+        '400':
+          description: Invalid search parameters
+        '500':
+          description: Server error during search
+
+  /transactions/{id}:
+    put:
+      summary: Update transaction category
+      description: Update the category of a specific transaction by its ID.
+      operationId: updateTransactionCategory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCategoryRequest'
+      responses:
+        '200':
+          description: Transaction category updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecord'
+        '404':
+          description: Transaction not found
+        '400':
+          description: Invalid request body
+
+  /transactions/classify:
+    put:
+      summary: Classify all transactions
+      description: Asynchronously classify all uncategorized transactions using a classifier.
+      operationId: classifyTransactions
+      responses:
+        '202':
+          description: Classification task started successfully
+        '500':
+          description: Server error during classification task
+
+  /banks:
+    get:
+      summary: List supported banks
+      description: Returns a list of supported banks for importing transactions.
+      operationId: listBanks
+      responses:
+        '200':
+          description: Successful list of banks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  description: "BankA"
+        '500':
+          description: Server error during bank listing
+
+components:
+  schemas:
+    FinancialRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique transaction identifier
+        bank:
+          type: string
+          description: Bank associated with the transaction
+        date:
+          type: string
+          format: date-time
+          description: Transaction date and time
+        description:
+          type: string
+          description: Description of the transaction
+        amount:
+          type: number
+          format: double
+          description: Transaction amount
+        balance:
+          type: number
+          format: double
+          description: Account balance after the transaction
+        category:
+          type: string
+          description: Category of the transaction
+
+    UpdateCategoryRequest:
+      type: object
+      properties:
+        category:
+          type: string
+          description: New category for the transaction
+
+
+tags:
+  - name: Transactions
+    description: Endpoints related to bank transactions
+  - name: Banks
+    description: Endpoints related to supported banks
