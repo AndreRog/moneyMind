@@ -20,8 +20,9 @@ public class SearchTransactions {
                                                    String from,
                                                    String to,
                                                    int limit,
-                                                   String cursor
+                                                   String cursor,
+                                                   String sort
     ){
-        return this.transactionRepository.search(transactionId, category,bank,from,to, limit, cursor);
+        return this.transactionRepository.search(transactionId, category,bank,from,to, limit, cursor, sort);
     }
 }

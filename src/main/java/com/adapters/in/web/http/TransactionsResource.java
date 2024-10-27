@@ -60,10 +60,11 @@ public class TransactionsResource {
             @QueryParam("from") String from,
             @QueryParam("to") String to,
             @QueryParam("limit") int limit,
-            @QueryParam("cursor") String cursor
+            @QueryParam("cursor") String cursor,
+            @QueryParam("sort") String sort
     ) {
         final SearchResponse<FinancialRecord> searchResponse = this.searchTransactions.execute(
-                transactionId, category, bank, from, to, limit, cursor
+                transactionId, category, bank, from, to, limit, cursor, sort
         );
 
         return Response.ok(toPageResponse(searchResponse, uriInfo, transactionId, category, bank, from, to, cursor)).build();
@@ -124,6 +125,4 @@ public class TransactionsResource {
 
         return new Page<>(Link.buildNextLink(searchResponse, uriInfo, parameters), new Link(previous), searchResponse.list());
     }
-
-
 }

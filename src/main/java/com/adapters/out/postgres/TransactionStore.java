@@ -8,6 +8,7 @@ import com.app.ports.TransactionRepository;
 import org.jooq.DSLContext;
 import org.jooq.Result;
 import org.jooq.SelectConditionStep;
+import org.jooq.SortField;
 import org.jooq.exception.IntegrityConstraintViolationException;
 import org.jooq.generated.tables.BankTransaction;
 import org.jooq.generated.tables.records.BankTransactionRecord;
@@ -95,7 +96,7 @@ public class TransactionStore extends Store implements TransactionRepository  {
 
     @Override
     public SearchResponse<FinancialRecord> search(String id, String category, String bank, String from, String to,
-                                                  int limit, String cursor) {
+                                                  int limit, String cursor, String sort) {
 
         final int sanitizedLimit = this.sanitizeLimit(limit);
         final int sanitizedCursor = this.sanitizeCursor(cursor);
@@ -125,7 +126,14 @@ public class TransactionStore extends Store implements TransactionRepository  {
 
         }
 
-        final Result<BankTransactionRecord> financialRecords = where.limit(sanitizedLimit + 1).fetch();
+        SortField<OffsetDateTime> sortBy = BankTransaction.BANK_TRANSACTION.DATE.desc();
+        if( sort != null && sort.equals("ASC")) {
+            sortBy = BankTransaction.BANK_TRANSACTION.DATE.asc();
+        }
+
+        final Result<BankTransactionRecord> financialRecords = where.orderBy(sortBy)
+                .limit(sanitizedLimit + 1)
+                .fetch();
 
         String newCursor = null;
 
