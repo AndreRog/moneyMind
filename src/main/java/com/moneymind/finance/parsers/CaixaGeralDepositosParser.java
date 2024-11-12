@@ -42,8 +42,6 @@ public class CaixaGeralDepositosParser implements TransactionsParser {
             List<String[]> allData = csvReader.readAll();
             // print Data
             for (String[] row : allData) {
-                for (String cell : row) {
-                    System.out.print(cell + "\t");
                     final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
                     OffsetDateTime transactionDate = LocalDate.parse(
                             row[1],
@@ -62,7 +60,6 @@ public class CaixaGeralDepositosParser implements TransactionsParser {
                             BigDecimal.valueOf(valueSpent),
                             BigDecimal.valueOf(finalBalance)
                     ));
-                }
             }
         } catch (Exception ex) {
                 logger.error(ex.getMessage());
