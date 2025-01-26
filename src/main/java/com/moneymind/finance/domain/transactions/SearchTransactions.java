@@ -16,6 +16,7 @@ public class SearchTransactions {
 
     public SearchResponse<FinancialRecord> execute(String transactionId,
                                                    String category,
+                                                   String dimension,
                                                    String bank,
                                                    String from,
                                                    String to,
@@ -23,6 +24,6 @@ public class SearchTransactions {
                                                    String cursor,
                                                    String sort
     ){
-        return this.transactionRepository.search(transactionId, category,bank,from,to, limit, cursor, sort);
+        return this.transactionRepository.search(transactionId, category, dimension, bank,from, to, limit, cursor, sort);
     }
 }

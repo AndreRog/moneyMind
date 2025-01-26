@@ -1,6 +1,8 @@
 package com.moneymind.finance.domain.core;
 
 
+import org.apache.poi.hssf.record.crypto.Biff8DecryptingStream;
+
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
@@ -30,6 +32,15 @@ public class FinancialRecord {
         this.amount = amount;
         this.finalBalance = finalBalance;
         this.category = String.valueOf(Category.UNCATEGORIZED);  // default
+    }
+
+    public FinancialRecord(String category, BigDecimal amount) {
+        this.bankName = null;
+        this.date = null;
+        this.description = null;
+        this.amount = amount;
+        this.finalBalance = null;
+        this.category = category;
     }
 
     public String getId() {

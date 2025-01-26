@@ -5,10 +5,7 @@ import com.moneymind.finance.domain.core.FinancialRecord;
 import com.moneymind.finance.exceptions.ExceptionCode;
 import com.moneymind.finance.exceptions.StoreException;
 import com.moneymind.finance.ports.TransactionRepository;
-import org.jooq.DSLContext;
-import org.jooq.Result;
-import org.jooq.SelectConditionStep;
-import org.jooq.SortField;
+import org.jooq.*;
 import org.jooq.exception.IntegrityConstraintViolationException;
 import org.jooq.generated.tables.BankTransaction;
 import org.jooq.generated.tables.records.BankTransactionRecord;
@@ -22,8 +19,11 @@ import java.sql.BatchUpdateException;
 import java.time.OffsetDateTime;
 import java.util.Base64;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static org.jooq.impl.DSL.sumDistinct;
 
 public class TransactionStore extends Store implements TransactionRepository  {
 
@@ -94,13 +94,19 @@ public class TransactionStore extends Store implements TransactionRepository  {
     }
 
     @Override
-    public SearchResponse<FinancialRecord> search(String id, String category, String bank, String from, String to,
-                                                  int limit, String cursor, String sort) {
+    public SearchResponse<FinancialRecord> search(String id, String category, String dimension, String bank,
+                                                  String from, String to, int limit, String cursor,
+                                                  String sort) {
 
         final int sanitizedLimit = this.sanitizeLimit(limit);
         final int sanitizedCursor = this.sanitizeCursor(cursor);
-        SelectConditionStep<BankTransactionRecord> where = this.dataSource
-                .selectFrom(BankTransaction.BANK_TRANSACTION)
+
+        if(dimension != null && !dimension.isEmpty()) {
+            return searchByDimension(dimension, from, to);
+        }
+
+        SelectConditionStep<BankTransactionRecord> where = this.dataSource.
+                selectFrom(BankTransaction.BANK_TRANSACTION)
                 .where(BankTransaction.BANK_TRANSACTION.ID.ge(sanitizedCursor));
 
         if(id != null && !id.isEmpty()) {
@@ -125,9 +131,9 @@ public class TransactionStore extends Store implements TransactionRepository  {
 
         }
 
-        SortField<OffsetDateTime> sortBy = BankTransaction.BANK_TRANSACTION.DATE.desc();
+        List<SortField<?>> sortBy = List.of(BankTransaction.BANK_TRANSACTION.DATE.desc(), BankTransaction.BANK_TRANSACTION.ID.desc());
         if( sort != null && sort.equals("ASC")) {
-            sortBy = BankTransaction.BANK_TRANSACTION.DATE.asc();
+            sortBy = List.of(BankTransaction.BANK_TRANSACTION.DATE.asc(),  BankTransaction.BANK_TRANSACTION.ID.asc());
         }
 
         final Result<BankTransactionRecord> financialRecords = where.orderBy(sortBy)
@@ -147,6 +153,49 @@ public class TransactionStore extends Store implements TransactionRepository  {
                 financialRecords.stream().map(TransactionStore::toModel).collect(Collectors.toList()),
                 sanitizedLimit,
                 newCursor
+        );
+    }
+
+    private SearchResponse<FinancialRecord> searchByDimension(String dimension, String from, String to) {
+
+        final SelectJoinStep<Record2<String, BigDecimal>> fromClause = this.dataSource
+                .select(
+                        Objects.requireNonNull(BankTransaction.BANK_TRANSACTION.field(dimension)).cast(String.class),
+                        sumDistinct(BankTransaction.BANK_TRANSACTION.VALUE)
+                )
+                .from(BankTransaction.BANK_TRANSACTION);
+
+        SelectConditionStep<Record2<String, BigDecimal>> where = null;
+        if(from != null && !from.isEmpty()) {
+            where = fromClause.where(
+                    BankTransaction.BANK_TRANSACTION.DATE.greaterOrEqual(OffsetDateTime.parse(from))
+            );
+        }
+
+        if(to != null && !to.isEmpty()) {
+            if( where != null) {
+                where = where.and(BankTransaction.BANK_TRANSACTION.DATE.lessOrEqual(OffsetDateTime.parse(to)));
+            }else {
+                where = fromClause.where(
+                        BankTransaction.BANK_TRANSACTION.DATE.greaterOrEqual(OffsetDateTime.parse(to))
+                );
+            }
+        }
+
+        Result<Record2<String, BigDecimal>> txByCategory;
+        txByCategory = Objects.requireNonNullElse(where, fromClause)
+                .groupBy(BankTransaction.BANK_TRANSACTION.CATEGORY)
+                .fetch();
+
+        List<FinancialRecord> records = txByCategory.stream()
+                .map(record -> new FinancialRecord(
+                        record.get(0, String.class), record.get(1, BigDecimal.class))
+                ).toList();
+
+        return new SearchResponse<>(
+                records,
+                100,
+                null
         );
     }
 

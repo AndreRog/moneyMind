@@ -15,6 +15,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -22,6 +23,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @ApplicationScoped
@@ -40,29 +42,36 @@ public class CaixaGeralDepositosParser implements TransactionsParser {
             // create csvReader object and skip first Line
             BankType bankTypeAnnotation = this.getClass().getAnnotation(BankType.class);
             List<String[]> allData = csvReader.readAll();
-            // print Data
-            for (String[] row : allData) {
-                    final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-                    OffsetDateTime transactionDate = LocalDate.parse(
-                            row[1],
-                            formatter
-                    ).atStartOfDay().atOffset(ZoneOffset.UTC);
 
-                    transactionDate = transactionDate.withOffsetSameInstant(ZoneOffset.UTC);
-                    double valueSpent = Double.parseDouble(row[3].replace(".", "").replace(",", "."));
-                    String description = row[2];
-                    double finalBalance = Double.parseDouble(row[5].replace(".", "").replace(",", "."));
+            // skip last line
+            for (int i = 0; i < allData.size() - 1; i++) {
+                String [] row = allData.get(i);
+                final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+                OffsetDateTime transactionDate = LocalDate.parse(
+                        row[1],
+                        formatter
+                ).atStartOfDay().atOffset(ZoneOffset.UTC);
 
-                    financialRecords.add(new FinancialRecord(
-                            bankTypeAnnotation.value(),
-                            transactionDate,
-                            description,
-                            BigDecimal.valueOf(valueSpent),
-                            BigDecimal.valueOf(finalBalance)
-                    ));
+                transactionDate = transactionDate.withOffsetSameInstant(ZoneOffset.UTC);
+                double valueSpent;
+                if (row[3].isBlank() || row[3].isEmpty()) {
+                    valueSpent = Double.parseDouble(row[4].replace(".", "").replace(",", "."));
+                } else {
+                    valueSpent = -(Double.parseDouble(row[3].replace(".", "").replace(",", ".")));
+                }
+                String description = row[2];
+                double finalBalance = Double.parseDouble(row[5].replace(".", "").replace(",", "."));
+
+                financialRecords.add(new FinancialRecord(
+                        bankTypeAnnotation.value(),
+                        transactionDate,
+                        description,
+                        BigDecimal.valueOf(valueSpent),
+                        BigDecimal.valueOf(finalBalance)
+                ));
             }
         } catch (Exception ex) {
-                logger.error(ex.getMessage());
+            logger.error(ex.getMessage());
         }
 
         return financialRecords;

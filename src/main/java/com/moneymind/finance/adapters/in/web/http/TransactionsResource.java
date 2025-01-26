@@ -18,6 +18,7 @@ import org.jboss.resteasy.reactive.RestForm;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -38,7 +39,6 @@ public class TransactionsResource {
 
     }
 
-
     @POST
     @Path("/import")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -48,7 +48,6 @@ public class TransactionsResource {
         return Response.noContent().build();
     }
 
-
     @GET
     @Path("/search")
     @Produces(MediaType.APPLICATION_JSON)
@@ -56,6 +55,7 @@ public class TransactionsResource {
             @Context UriInfo uriInfo,
             @QueryParam("id") String transactionId,
             @QueryParam("category") String category,
+            @QueryParam("dimension") String dimension,
             @QueryParam("bank") String bank,
             @QueryParam("from") String from,
             @QueryParam("to") String to,
@@ -64,10 +64,19 @@ public class TransactionsResource {
             @QueryParam("sort") String sort
     ) {
         final SearchResponse<FinancialRecord> searchResponse = this.searchTransactions.execute(
-                transactionId, category, bank, from, to, limit, cursor, sort
+                transactionId, category, dimension, bank, from, to, limit, cursor, sort
         );
 
         return Response.ok(toPageResponse(searchResponse, uriInfo, transactionId, category, bank, from, to, cursor)).build();
+    }
+
+    @GET
+    @Path("/categories")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response searchCategories(
+            @Context UriInfo uriInfo
+    ){
+        return Response.ok(List.of("HOME", "RESTAURANTS", "GROCERIES", "TRAVELS", "SALARY")).build();
     }
 
     @PUT
@@ -100,15 +109,9 @@ public class TransactionsResource {
         Map<String, String> parameters = new HashMap<>();
 
         // previous only if not first page
-        String previous = uriInfo.getRequestUri().toString();
-        if (cursor == null || cursor.isBlank()) {
-            previous = "";
-        }
-
         if (transactionId != null && transactionId.isBlank()) {
             parameters.put("transactionId", transactionId);
         }
-
         if (category != null && category.isBlank()) {
             parameters.put("category", category);
         }
@@ -118,11 +121,10 @@ public class TransactionsResource {
         if (from != null && from.isBlank()) {
             parameters.put("from", from);
         }
-
         if (to != null && to.isBlank()) {
             parameters.put("to", to);
         }
 
-        return new Page<>(Link.buildNextLink(searchResponse, uriInfo, parameters), new Link(previous), searchResponse.list());
+        return new Page<>(Link.buildNextLink(searchResponse, uriInfo, parameters), searchResponse.list());
     }
 }

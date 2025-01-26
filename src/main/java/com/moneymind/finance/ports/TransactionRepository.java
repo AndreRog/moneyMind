@@ -12,7 +12,7 @@ public interface TransactionRepository {
 
     void insertTransactions(final List<FinancialRecord> financialRecords);
 
-    SearchResponse<FinancialRecord> search(String id, String category, String bank, String from,
+    SearchResponse<FinancialRecord> search(String id, String category, String dimension, String bank, String from,
                                            String to, int limit, String cursor, String sort);
 
     void update(final UUID id, final String category);
