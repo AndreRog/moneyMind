@@ -64,7 +64,8 @@ public class TransactionsResource {
             @QueryParam("sort") String sort
     ) {
         final SearchResponse<FinancialRecord> searchResponse = this.searchTransactions.execute(
-                transactionId, category, dimension, bank, from, to, limit, cursor, sort
+                transactionId, category, dimension, bank, from, to, 100, //TODO: support limit
+                cursor, sort
         );
 
         return Response.ok(toPageResponse(searchResponse, uriInfo, transactionId, category, bank, from, to, cursor)).build();
@@ -76,7 +77,14 @@ public class TransactionsResource {
     public Response searchCategories(
             @Context UriInfo uriInfo
     ){
-        return Response.ok(List.of("HOME", "RESTAURANTS", "GROCERIES", "TRAVELS", "SALARY")).build();
+        // Sure BUT THESE CATEGORIES SHOULD BE FOR TRAINING
+        // TRAVEL -> FLIGHTS, ACCOMMODATION
+        return Response.ok(List.of("HOUSING", "RESTAURANTS", "GROCERIES", "TRAVEL", "FLIGHTS", "ACCOMMODATION",
+                                    "INCOME", "OTHERS", "NICO", "HEALTH & WELLNESS", "GYM", "PSYCHOLOGY", "SUBSCRIPTIONS",
+                                    "NETFLIX", "PRIME", "APPLE", "NESPRESSO", "UTILITIES", "WATER", "ELECTRICITY",
+                                    "APPLIANCES", "SALARY", "FUN MONEY", "INTERNET", "MOBILE", "TRANSFER BETWEEN ACCOUNTS",
+                                    "FINANCIAL EXPENSES", "CAR", "GASOLINE", "CAR TOOL"
+        )).build();
     }
 
     @PUT
