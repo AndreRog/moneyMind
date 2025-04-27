@@ -1,6 +1,7 @@
 package com.moneymind.finance.ports;
 
 
+import com.moneymind.classfication.application.PartialTransaction;
 import com.moneymind.finance.domain.core.FinancialRecord;
 
 import java.util.List;
@@ -10,8 +11,12 @@ import java.util.List;
  */
 public interface TransactionClassifier {
 
+    List<FinancialRecord> classify();
+
     FinancialRecord classify(FinancialRecord financialRecord);
 
-    FinancialRecord classify(List<FinancialRecord> financialRecords);
+    List<FinancialRecord> classify(List<FinancialRecord> financialRecords) throws Exception;
+
+    String classifyTransaction(PartialTransaction partialTransaction) throws Exception;
 
 }

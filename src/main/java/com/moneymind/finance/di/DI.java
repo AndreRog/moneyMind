@@ -1,7 +1,9 @@
 package com.moneymind.finance.di;
 
+import com.moneymind.classfication.adapters.out.postgres.TransactionsStore;
+import com.moneymind.classfication.application.RandomForestClassifier;
+import com.moneymind.classfication.ports.TrainingDataService;
 import com.moneymind.finance.adapters.out.postgres.TransactionStore;
-import com.moneymind.finance.adapters.out.txClassifier.ClassificationEngine;
 import com.moneymind.finance.domain.banks.ListBanks;
 import com.moneymind.finance.domain.transactions.ClassifyTransactions;
 import com.moneymind.finance.domain.transactions.ImportTransactions;
@@ -65,15 +67,21 @@ public class DI {
 
     @ApplicationScoped
     @Produces
-    TransactionClassifier transactionClassifier( ) {
-        return new ClassificationEngine();
+    ClassifyTransactions classifyTransactions(final TransactionClassifier transactionClassifier,
+                                              final TransactionRepository transactionRepository ) {
+        return new ClassifyTransactions(transactionClassifier, transactionRepository);
     }
 
     @ApplicationScoped
     @Produces
-    ClassifyTransactions classifyTransactions(final TransactionClassifier transactionClassifier,
-                                              final TransactionRepository transactionRepository ) {
-        return new ClassifyTransactions(transactionClassifier, transactionRepository);
+    TrainingDataService producesTxStore(final DSLContext dataSource) {
+        return new TransactionsStore(dataSource);
+    }
+
+    @ApplicationScoped
+    @Produces
+    TransactionClassifier produceRandomForestClassifier(final TrainingDataService trainingDataService) throws Exception {
+        return new RandomForestClassifier(trainingDataService);
     }
 
 }

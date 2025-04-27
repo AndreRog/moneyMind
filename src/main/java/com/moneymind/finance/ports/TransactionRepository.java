@@ -18,4 +18,5 @@ public interface TransactionRepository {
     void update(final UUID id, final String category);
 
     FinancialRecord getById(final UUID id);
+
 }

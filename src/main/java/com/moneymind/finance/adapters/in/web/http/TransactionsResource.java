@@ -102,12 +102,20 @@ public class TransactionsResource {
         return Response.ok(record).build();
     }
 
-    @PUT
+//    @PUT
+//    @Produces(MediaType.APPLICATION_JSON)
+//    @Consumes(MediaType.APPLICATION_JSON)
+//    public Response classifyTransaction() {
+//        CompletableFuture<Void> classifyTask = this.classifyTransactions.execute();
+//        return Response.accepted().build();
+//    }
+
+    @POST
+    @Path("/classify")
     @Produces(MediaType.APPLICATION_JSON)
-    @Consumes(MediaType.APPLICATION_JSON)
-    public Response classifyTransaction() {
-        CompletableFuture<Void> classifyTask = this.classifyTransactions.execute();
-        return Response.accepted().build();
+    public Response classifyTransactions() {
+       this.classifyTransactions.execute();
+       return  Response.accepted().build();
     }
 
 

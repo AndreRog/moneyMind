@@ -24,6 +24,7 @@ public class ExceptionFilter implements ExceptionMapper<Exception> {
     @Override
     public Response toResponse(Exception exception)
     {
+        LOG.error(exception);
         final String errorURI = UriBuilder.fromUri(uriInfo.getBaseUri()).path(Problems.ERROR).build().toString();
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                 .entity(
@@ -32,4 +33,3 @@ public class ExceptionFilter implements ExceptionMapper<Exception> {
                 .build();
     }
 }
-
