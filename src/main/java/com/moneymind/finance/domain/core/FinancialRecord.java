@@ -13,7 +13,7 @@ public class FinancialRecord {
     private final String description;
     private final BigDecimal amount;
     private final BigDecimal finalBalance;
-    private String category;
+    private String category; // TODO: convert to category
 
     public FinancialRecord(String id, String bankName, OffsetDateTime date, String description, BigDecimal amount, BigDecimal finalBalance, String category) {
         this.id = id;

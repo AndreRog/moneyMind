@@ -1,7 +1,6 @@
 package com.moneymind.finance.di;
 
 import com.moneymind.finance.adapters.out.postgres.TransactionStore;
-import com.moneymind.finance.adapters.out.txClassifier.ClassificationEngine;
 import com.moneymind.finance.domain.banks.ListBanks;
 import com.moneymind.finance.domain.transactions.ClassifyTransactions;
 import com.moneymind.finance.domain.transactions.ImportTransactions;
