@@ -1,4 +1,4 @@
-package com.moneymind.finance.exceptions;
+package com.moneymind.finance.infrastrucuture.postgres;
 
 public class StoreException extends RuntimeException{
     private final ExceptionCode code;

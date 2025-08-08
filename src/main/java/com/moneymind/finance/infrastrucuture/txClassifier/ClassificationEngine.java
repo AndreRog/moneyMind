@@ -1,7 +1,5 @@
 package com.moneymind.finance.adapters.out.txClassifier;
 
-import com.moneymind.classfication.application.PartialTransaction;
-import com.moneymind.classfication.application.RandomForestClassifier;
 import com.moneymind.finance.domain.SearchResponse;
 import com.moneymind.finance.domain.core.FinancialRecord;
 import com.moneymind.finance.domain.transactions.ClassifyTransactions;
@@ -15,26 +13,18 @@ public class ClassificationEngine implements TransactionClassifier {
 
     private final Logger LOG = Logger.getLogger(ClassificationEngine.class);
 
-    private TransactionClassifier randomForestClassifier;
+    private TransactionClassifier transactionClassifier;
     private TransactionRepository transactionRepository;
 
-    public ClassificationEngine(final RandomForestClassifier randomForestClassifier,
+    public ClassificationEngine(final ClassificationEngine transactionClassifier,
                                 final TransactionRepository transactionRepository) {
-        this.randomForestClassifier = randomForestClassifier;
+        this.transactionClassifier = transactionClassifier;
         this.transactionRepository = transactionRepository;
     }
 
     @Override
     public List<FinancialRecord> classify() {
-        SearchResponse<FinancialRecord> search = this.transactionRepository.search(null, null, null, null, null, null,
-                80000, null, null);
-        for(FinancialRecord record: search.list()) {
-            try {
-                randomForestClassifier.classifyTransaction(new PartialTransaction( record.getDescription(), record.getAmount(), record.getCategory()));
-            } catch (Exception e) {
-                LOG.error("Something went wrong classifying shit");
-            }
-        }
+
         return List.of();
     }
 
@@ -51,8 +41,4 @@ public class ClassificationEngine implements TransactionClassifier {
         return null;
     }
 
-    @Override
-    public String classifyTransaction(PartialTransaction partialTransaction) throws Exception {
-        return "";
-    }
 }

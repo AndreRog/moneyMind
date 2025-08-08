@@ -1,9 +1,7 @@
 package com.moneymind.finance.di;
 
-import com.moneymind.classfication.adapters.out.postgres.TransactionsStore;
-import com.moneymind.classfication.application.RandomForestClassifier;
-import com.moneymind.classfication.ports.TrainingDataService;
 import com.moneymind.finance.adapters.out.postgres.TransactionStore;
+import com.moneymind.finance.adapters.out.txClassifier.ClassificationEngine;
 import com.moneymind.finance.domain.banks.ListBanks;
 import com.moneymind.finance.domain.transactions.ClassifyTransactions;
 import com.moneymind.finance.domain.transactions.ImportTransactions;
@@ -18,9 +16,12 @@ import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Produces;
+import org.jboss.logging.Logger;
 import org.jooq.DSLContext;
 
 public class DI {
+
+    Logger LOG = Logger.getLogger(DI.class);
 
     @Inject
     DSLContext dataSource;
@@ -28,10 +29,9 @@ public class DI {
 
     @ApplicationScoped
     @Produces
-    TransactionRepository transactionRepository(final DSLContext dataSource){
+    TransactionRepository transactionRepository(final DSLContext dataSource) {
         return new TransactionStore(dataSource);
     }
-
 
 
     @ApplicationScoped
@@ -63,25 +63,6 @@ public class DI {
     @Produces
     ListBanks listBanks(final TransactionsParserFactory transactionsParserFactory) {
         return new ListBanks(transactionsParserFactory);
-    }
-
-    @ApplicationScoped
-    @Produces
-    ClassifyTransactions classifyTransactions(final TransactionClassifier transactionClassifier,
-                                              final TransactionRepository transactionRepository ) {
-        return new ClassifyTransactions(transactionClassifier, transactionRepository);
-    }
-
-    @ApplicationScoped
-    @Produces
-    TrainingDataService producesTxStore(final DSLContext dataSource) {
-        return new TransactionsStore(dataSource);
-    }
-
-    @ApplicationScoped
-    @Produces
-    TransactionClassifier produceRandomForestClassifier(final TrainingDataService trainingDataService) throws Exception {
-        return new RandomForestClassifier(trainingDataService);
     }
 
 }

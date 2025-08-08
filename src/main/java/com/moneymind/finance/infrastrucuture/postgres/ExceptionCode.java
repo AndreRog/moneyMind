@@ -1,4 +1,4 @@
-package com.moneymind.finance.exceptions;
+package com.moneymind.finance.infrastrucuture.postgres;
 
 public enum ExceptionCode {
     DUPLICATED_RECORD,
