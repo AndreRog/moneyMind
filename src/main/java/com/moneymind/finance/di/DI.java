@@ -1,13 +1,11 @@
 package com.moneymind.finance.di;
 
-import com.moneymind.finance.adapters.out.postgres.TransactionStore;
 import com.moneymind.finance.domain.banks.ListBanks;
-import com.moneymind.finance.domain.transactions.ClassifyTransactions;
 import com.moneymind.finance.domain.transactions.ImportTransactions;
 import com.moneymind.finance.domain.transactions.SearchTransactions;
 import com.moneymind.finance.domain.transactions.UpdateTransactions;
+import com.moneymind.finance.infrastrucuture.postgres.TransactionStore;
 import com.moneymind.finance.parsers.TransactionsParserFactory;
-import com.moneymind.finance.ports.TransactionClassifier;
 import com.moneymind.finance.ports.TransactionRepository;
 import com.moneymind.finance.ports.TransactionsParser;
 import jakarta.enterprise.context.ApplicationScoped;

@@ -1,9 +1,7 @@
-package com.moneymind.finance.adapters.out.postgres;
+package com.moneymind.finance.infrastrucuture.postgres;
 
 import com.moneymind.finance.domain.SearchResponse;
 import com.moneymind.finance.domain.core.FinancialRecord;
-import com.moneymind.finance.infrastrucuture.postgres.ExceptionCode;
-import com.moneymind.finance.infrastrucuture.postgres.StoreException;
 import com.moneymind.finance.ports.TransactionRepository;
 import org.jooq.*;
 import org.jooq.exception.IntegrityConstraintViolationException;
