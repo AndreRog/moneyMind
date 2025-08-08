@@ -16,9 +16,12 @@ import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Produces;
+import org.jboss.logging.Logger;
 import org.jooq.DSLContext;
 
 public class DI {
+
+    Logger LOG = Logger.getLogger(DI.class);
 
     @Inject
     DSLContext dataSource;
@@ -26,10 +29,9 @@ public class DI {
 
     @ApplicationScoped
     @Produces
-    TransactionRepository transactionRepository(final DSLContext dataSource){
+    TransactionRepository transactionRepository(final DSLContext dataSource) {
         return new TransactionStore(dataSource);
     }
-
 
 
     @ApplicationScoped
@@ -61,19 +63,6 @@ public class DI {
     @Produces
     ListBanks listBanks(final TransactionsParserFactory transactionsParserFactory) {
         return new ListBanks(transactionsParserFactory);
-    }
-
-    @ApplicationScoped
-    @Produces
-    TransactionClassifier transactionClassifier( ) {
-        return new ClassificationEngine();
-    }
-
-    @ApplicationScoped
-    @Produces
-    ClassifyTransactions classifyTransactions(final TransactionClassifier transactionClassifier,
-                                              final TransactionRepository transactionRepository ) {
-        return new ClassifyTransactions(transactionClassifier, transactionRepository);
     }
 
 }
