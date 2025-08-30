@@ -1,8 +1,8 @@
 package com.moneymind.finance.domain.transactions;
 
 import com.moneymind.finance.domain.core.FinancialRecord;
+import com.moneymind.finance.domain.ports.TransactionRepository;
 import com.moneymind.finance.parsers.TransactionsParserFactory;
-import com.moneymind.finance.ports.TransactionRepository;
 import com.moneymind.finance.ports.TransactionsParser;
 import org.jboss.logging.Logger;
 

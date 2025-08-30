@@ -1,10 +1,8 @@
-package com.moneymind.finance.adapters.out.postgres;
+package com.moneymind.finance.infrastrucuture.postgres;
 
-import com.moneymind.finance.domain.SearchResponse;
+import com.moneymind.finance.domain.PagedResult;
 import com.moneymind.finance.domain.core.FinancialRecord;
-import com.moneymind.finance.infrastrucuture.postgres.ExceptionCode;
-import com.moneymind.finance.infrastrucuture.postgres.StoreException;
-import com.moneymind.finance.ports.TransactionRepository;
+import com.moneymind.finance.domain.ports.TransactionRepository;
 import org.jooq.*;
 import org.jooq.exception.IntegrityConstraintViolationException;
 import org.jooq.generated.tables.BankTransaction;
@@ -25,7 +23,7 @@ import java.util.stream.Collectors;
 
 import static org.jooq.impl.DSL.sumDistinct;
 
-public class TransactionStore extends Store implements TransactionRepository  {
+public class TransactionStore extends Store implements TransactionRepository {
 
     private static final Logger logger = LoggerFactory.getLogger(TransactionStore.class);
     private static final String PLSQL_DUPLICATED_RECORD_ERROR_CODE = "23505";
@@ -94,10 +92,11 @@ public class TransactionStore extends Store implements TransactionRepository  {
     }
 
     @Override
-    public SearchResponse<FinancialRecord> search(String id, String category, String dimension, String bank,
-                                                  String from, String to, int limit, String cursor,
-                                                  String sort) {
+    public PagedResult<FinancialRecord> search(String id, String category, String dimension, String bank,
+                                               String from, String to, int limit, String cursor,
+                                               String sort) {
 
+        // TODO: revert his to sanitize
         final int sanitizedLimit = this.sanitizeLimit(limit);
         final int sanitizedCursor = this.sanitizeCursor(cursor);
 
@@ -141,7 +140,6 @@ public class TransactionStore extends Store implements TransactionRepository  {
                 .fetch();
 
         String newCursor = null;
-
         boolean hasMoreRecords = !financialRecords.isEmpty() && financialRecords.size() >= sanitizedLimit + 1;
         if ( hasMoreRecords ) {
             BankTransactionRecord rec = financialRecords.remove(financialRecords.size() - 1);
@@ -149,14 +147,40 @@ public class TransactionStore extends Store implements TransactionRepository  {
                     Base64.getEncoder().encode(String.valueOf(rec.getId()).getBytes(StandardCharsets.UTF_8)));
         }
 
-        return new SearchResponse<>(
+        return new PagedResult<>(
                 financialRecords.stream().map(TransactionStore::toModel).collect(Collectors.toList()),
                 sanitizedLimit,
                 newCursor
         );
     }
 
-    private SearchResponse<FinancialRecord> searchByDimension(String dimension, String from, String to) {
+    @Override
+    public PagedResult<FinancialRecord> fetchNoCategoriesTransaction(int limit, String cursor) {
+        int sanitizedLimit = this.sanitizeLimit(limit);
+        int sanitizedCursor = this.sanitizeCursor(cursor);
+
+        List<BankTransactionRecord> bankTransactionRecords = this.dataSource.selectFrom(BankTransaction.BANK_TRANSACTION)
+                .where(BankTransaction.BANK_TRANSACTION.CATEGORY.isNull())
+                .and(BankTransaction.BANK_TRANSACTION.ID.ge(sanitizedCursor))
+                .limit(sanitizedLimit + 1)
+                .fetchInto(BankTransactionRecord.class);
+
+        String newCursor = null;
+        boolean hasMoreRecords = !bankTransactionRecords.isEmpty() && bankTransactionRecords.size() >= sanitizedLimit + 1;
+        if ( hasMoreRecords ) {
+            BankTransactionRecord rec = bankTransactionRecords.remove(bankTransactionRecords.size() - 1);
+            newCursor = new String(
+                    Base64.getEncoder().encode(String.valueOf(rec.getId()).getBytes(StandardCharsets.UTF_8)));
+        }
+
+        return new PagedResult<>(
+                bankTransactionRecords.stream().map(TransactionStore::toModel).collect(Collectors.toList()),
+                sanitizedLimit,
+                newCursor
+        );
+    }
+
+    private PagedResult<FinancialRecord> searchByDimension(String dimension, String from, String to) {
 
         final SelectJoinStep<Record2<String, BigDecimal>> fromClause = this.dataSource
                 .select(
@@ -192,7 +216,7 @@ public class TransactionStore extends Store implements TransactionRepository  {
                         record.get(0, String.class), record.get(1, BigDecimal.class))
                 ).toList();
 
-        return new SearchResponse<>(
+        return new PagedResult<>(
                 records,
                 100,
                 null

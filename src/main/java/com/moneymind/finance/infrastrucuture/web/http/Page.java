@@ -1,4 +1,4 @@
-package com.moneymind.finance.adapters.in.web.http;
+package com.moneymind.finance.infrastrucuture.web.http;
 
 
 import com.moneymind.finance.adapters.in.web.http.hateoas.Link;

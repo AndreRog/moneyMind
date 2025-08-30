@@ -2,8 +2,8 @@ package com.moneymind.domain.transactions;
 
 import com.moneymind.FinancialRecordTestFactory;
 import com.moneymind.finance.domain.core.FinancialRecord;
+import com.moneymind.finance.domain.ports.TransactionRepository;
 import com.moneymind.finance.domain.transactions.UpdateTransactions;
-import com.moneymind.finance.ports.TransactionRepository;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

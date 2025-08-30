@@ -1,7 +1,4 @@
-package com.moneymind.finance.adapters.out.postgres;
-
-import com.moneymind.finance.infrastrucuture.postgres.ExceptionCode;
-import com.moneymind.finance.infrastrucuture.postgres.StoreException;
+package com.moneymind.finance.infrastrucuture.postgres;
 
 import java.util.Base64;
 

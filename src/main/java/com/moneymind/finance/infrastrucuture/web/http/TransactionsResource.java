@@ -1,11 +1,15 @@
-package com.moneymind.finance.adapters.in.web.http; import com.moneymind.finance.adapters.in.web.http.dto.UpdateCategoryRequest;
+package com.moneymind.finance.infrastrucuture.web.http;
+
+import com.moneymind.finance.adapters.in.web.http.dto.UpdateCategoryRequest;
 import com.moneymind.finance.adapters.in.web.http.hateoas.Link;
-import com.moneymind.finance.domain.SearchResponse;
+import com.moneymind.finance.domain.PagedResult;
+import com.moneymind.finance.domain.core.ClassifiedFinancialRecord;
 import com.moneymind.finance.domain.transactions.ClassifyTransactions;
 import com.moneymind.finance.domain.transactions.ImportTransactions;
 import com.moneymind.finance.domain.transactions.SearchTransactions;
 import com.moneymind.finance.domain.core.FinancialRecord;
 import com.moneymind.finance.domain.transactions.UpdateTransactions;
+import com.moneymind.finance.infrastrucuture.web.http.dto.ClassificationRequest;
 import com.opencsv.CSVWriter;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Context;
@@ -21,13 +25,10 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 @Path("/transactions")
 public class TransactionsResource {
@@ -35,13 +36,16 @@ public class TransactionsResource {
     private final ImportTransactions importTransactions;
     private final SearchTransactions searchTransactions;
     private final UpdateTransactions updateTransactions;
+    private final ClassifyTransactions classifyTransactions;
+    private final UriInfo uriInfo;
 
     public TransactionsResource(ImportTransactions importTransactions, SearchTransactions searchTransactions,
-                                UpdateTransactions updateTransactions) {
+                                UpdateTransactions updateTransactions, final ClassifyTransactions classifyTransactions, UriInfo uriInfo) {
         this.importTransactions = importTransactions;
         this.searchTransactions = searchTransactions;
         this.updateTransactions = updateTransactions;
-
+        this.classifyTransactions = classifyTransactions;
+        this.uriInfo = uriInfo;
     }
 
     @POST
@@ -68,12 +72,12 @@ public class TransactionsResource {
             @QueryParam("cursor") String cursor,
             @QueryParam("sort") String sort
     ) {
-        final SearchResponse<FinancialRecord> searchResponse = this.searchTransactions.execute(
+        final PagedResult<FinancialRecord> pagedResult = this.searchTransactions.execute(
                 transactionId, category, dimension, bank, from, to, 100, //TODO: support limit
                 cursor, sort
         );
 
-        return Response.ok(toPageResponse(searchResponse, uriInfo, transactionId, category, bank, from, to, cursor)).build();
+        return Response.ok(toPageResponse(pagedResult, uriInfo, transactionId, category, bank, from, to, cursor)).build();
     }
 
     @GET
@@ -107,31 +111,28 @@ public class TransactionsResource {
         return Response.ok(record).build();
     }
 
-//    @PUT
-//    @Produces(MediaType.APPLICATION_JSON)
-//    @Consumes(MediaType.APPLICATION_JSON)
-//    public Response classifyTransaction() {
-//        CompletableFuture<Void> classifyTask = this.classifyTransactions.execute();
-//        return Response.accepted().build();
-//    }
-
     @POST
     @Path("/classify")
+    @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response classifyTransactions() {
-        return Response.accepted().build();
+    public Response classifyTransactions(
+            @Context UriInfo uriInfo,
+            ClassificationRequest classificationRequest) {
+
+        PagedResult<ClassifiedFinancialRecord> classifiedTx = this.classifyTransactions.execute(classificationRequest);
+        return Response.ok(toWebResponse(classifiedTx, uriInfo)).build();
     }
 
     @GET
     @Path("/export")
     public Response exportTransactions(@QueryParam("format") String format) {
         // Retrieve all transactions using the search method with null parameters
-        final SearchResponse<FinancialRecord> searchResponse = this.searchTransactions.execute(
+        final PagedResult<FinancialRecord> pagedResult = this.searchTransactions.execute(
                 null, null, null, null, null, null, 10000, // Large limit to get all transactions
                 null, null
         );
 
-        List<FinancialRecord> transactions = searchResponse.list();
+        List<FinancialRecord> transactions = pagedResult.list();
 
         // Default to YAML if format is not specified
         String requestedFormat = format != null ? format.toLowerCase() : "yaml";
@@ -244,7 +245,7 @@ public class TransactionsResource {
     }
 
 
-    private Page<FinancialRecord> toPageResponse(SearchResponse<FinancialRecord> searchResponse, UriInfo uriInfo,
+    private Page<FinancialRecord> toPageResponse(PagedResult<FinancialRecord> pagedResult, UriInfo uriInfo,
                                                  String transactionId, String category, String bank,
                                                  String from, String to, String cursor) {
         Map<String, String> parameters = new HashMap<>();
@@ -266,6 +267,10 @@ public class TransactionsResource {
             parameters.put("to", to);
         }
 
-        return new Page<>(Link.buildNextLink(searchResponse, uriInfo, parameters), searchResponse.list());
+        return new Page<>(Link.buildNextLink(pagedResult, uriInfo, parameters), pagedResult.list());
+    }
+
+    private Page<ClassifiedFinancialRecord> toWebResponse(PagedResult<ClassifiedFinancialRecord> pagedResult, UriInfo uriInfo) {
+        return new Page<>(Link.buildNextLink( pagedResult, uriInfo), pagedResult.list());
     }
 }

@@ -1,8 +1,8 @@
 package com.moneymind.finance.domain.transactions;
 
-import com.moneymind.finance.domain.SearchResponse;
+import com.moneymind.finance.domain.PagedResult;
 import com.moneymind.finance.domain.core.FinancialRecord;
-import com.moneymind.finance.ports.TransactionRepository;
+import com.moneymind.finance.domain.ports.TransactionRepository;
 import org.jboss.logging.Logger;
 
 
@@ -14,15 +14,15 @@ public class SearchTransactions {
         this.transactionRepository = transactionRepository;
     }
 
-    public SearchResponse<FinancialRecord> execute(String transactionId,
-                                                   String category,
-                                                   String dimension,
-                                                   String bank,
-                                                   String from,
-                                                   String to,
-                                                   int limit,
-                                                   String cursor,
-                                                   String sort
+    public PagedResult<FinancialRecord> execute(String transactionId,
+                                                String category,
+                                                String dimension,
+                                                String bank,
+                                                String from,
+                                                String to,
+                                                int limit,
+                                                String cursor,
+                                                String sort
     ){
         return this.transactionRepository.search(transactionId, category, dimension, bank,from, to, limit, cursor, sort);
     }
