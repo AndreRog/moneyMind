@@ -1,13 +1,15 @@
 package com.moneymind.finance.domain.transactions;
 
-import com.moneymind.finance.domain.SearchResponse;
+import com.moneymind.classifier.ports.TrainingDataService;
+import com.moneymind.finance.domain.PagedResult;
+import com.moneymind.finance.domain.core.ClassifiedFinancialRecord;
 import com.moneymind.finance.domain.core.FinancialRecord;
-import com.moneymind.finance.ports.TransactionClassifier;
-import com.moneymind.finance.ports.TransactionRepository;
+import com.moneymind.finance.domain.ports.TransactionRepository;
+import com.moneymind.finance.infrastrucuture.ports.TransactionClassifier;
+import com.moneymind.finance.infrastrucuture.web.http.dto.ClassificationRequest;
 import org.jboss.logging.Logger;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -21,33 +23,23 @@ public class ClassifyTransactions {
 
     // Use a cached thread pool or fixed thread pool for async task
     private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final TrainingDataService trainingDataService;
 
-    public ClassifyTransactions(TransactionClassifier transactionClassifier, TransactionRepository transactionRepository) {
+    public ClassifyTransactions(TransactionClassifier transactionClassifier, TransactionRepository transactionRepository,
+                                final TrainingDataService trainingDataService) {
         this.transactionClassifier = transactionClassifier;
         this.transactionRepository = transactionRepository;
+        this.trainingDataService = trainingDataService;
     }
 
-    public void execute() {
+    public PagedResult<ClassifiedFinancialRecord> execute(ClassificationRequest classificationRequest) {
         try{
-            SearchResponse<FinancialRecord> search = this.transactionRepository.search(null, null, null, null, null, null, 80000, null,null);
-            List<FinancialRecord> classify = transactionClassifier.classify(search.list());
+            PagedResult<FinancialRecord> search = this.transactionRepository.fetchNoCategoriesTransaction(100, classificationRequest.cursor());
+            List<ClassifiedFinancialRecord> classify = transactionClassifier.classify(search.list());
+            return  new PagedResult<>(classify, search.limit(), search.cursor());
         } catch (Exception e) {
             LOG.error(e);
             throw new RuntimeException(e);
         }
-        LOG.info("We are going to classify Stuff");
     }
-
-    // TODO: instead of classifying all do it in batches and should be done async ... this is not a blocking operation
-    // We can create a job/task, a first iteration should the ClassificationEngine that is a dumb impl or even a separate
-    // module
-//    public CompletableFuture<Void> execute() {
-
-//
-//        return CompletableFuture.runAsync(() -> {
-//            //find all uncategorized transactions
-//
-//            // TransactionClassifier allows me to use multiple implementations one which can now be an internal DUMB impl
-//        }, executor);
-//    }
 }

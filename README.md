@@ -95,6 +95,36 @@ Before you begin, ensure you have the following installed:
 - **PostgreSQL**: The database used for storing `bank_transactions`.
 - **Docker** (optional): For running PostgreSQL in a containerized environment.
 
+#### Native Libraries for Machine Learning (Required)
+
+This project uses Weka with native libraries for optimal performance. You need to install native BLAS/LAPACK libraries to avoid ARPACK warnings.
+
+**Ubuntu/Debian (WSL2):**
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libatlas3-base libopenblas-base libgfortran3
+```
+
+After installation, configure the alternatives:
+
+```bash
+sudo update-alternatives --config libblas.so
+sudo update-alternatives --config libblas.so.3
+sudo update-alternatives --config liblapack.so
+sudo update-alternatives --config liblapack.so.3
+```
+
+**Why This Is Needed:**
+
+The `netlib-java` library used by Weka requires native BLAS/LAPACK implementations for performance. Without these libraries, you'll see warnings like:
+
+```
+WARNING [com.git.fom.net.ARPACK] Failed to load implementation from: com.github.fommil.netlib.NativeSystemARPACK
+```
+
+While the application will still work using pure Java implementations, installing native libraries significantly improves performance for machine learning operations.
+
 ### Installation
 
 1. **Configure PostgreSQL:**

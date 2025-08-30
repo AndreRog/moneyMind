@@ -1,5 +1,6 @@
-package com.moneymind.finance.ports;
+package com.moneymind.finance.infrastrucuture.ports;
 
+import com.moneymind.finance.domain.core.ClassifiedFinancialRecord;
 import com.moneymind.finance.domain.core.FinancialRecord;
 
 import java.util.List;
@@ -13,5 +14,5 @@ public interface TransactionClassifier {
 
     FinancialRecord classify(FinancialRecord financialRecord);
 
-    List<FinancialRecord> classify(List<FinancialRecord> financialRecords) throws Exception;
+    List<ClassifiedFinancialRecord> classify(List<FinancialRecord> financialRecords) throws Exception;
 }

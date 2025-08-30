@@ -1,7 +1,7 @@
-package com.moneymind.finance.adapters.in.web.http.filters;
+package com.moneymind.finance.infrastrucuture.web.http.filters;
 
-import com.moneymind.finance.adapters.in.web.http.ExceptionCodes;
 import com.moneymind.finance.infrastrucuture.web.http.ApplicationError;
+import com.moneymind.finance.infrastrucuture.web.http.ExceptionCodes;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriBuilder;

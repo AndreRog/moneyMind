@@ -1,7 +1,7 @@
 package com.moneymind.finance.domain.transactions;
 
 import com.moneymind.finance.domain.core.FinancialRecord;
-import com.moneymind.finance.ports.TransactionRepository;
+import com.moneymind.finance.domain.ports.TransactionRepository;
 
 import java.util.List;
 import java.util.UUID;
