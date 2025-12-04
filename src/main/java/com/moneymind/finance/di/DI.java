@@ -45,8 +45,9 @@ public class DI {
     @ApplicationScoped
     @Produces
     ImportTransactions importTransactions(final TransactionsParserFactory transactionsParserFactory,
-                                          final TransactionRepository transactionStore) {
-        return new ImportTransactions(transactionsParserFactory, transactionStore);
+                                          final TransactionRepository transactionStore,
+                                          final TransactionClassifier transactionClassifier) {
+        return new ImportTransactions(transactionsParserFactory, transactionStore, transactionClassifier);
     }
 
     @ApplicationScoped

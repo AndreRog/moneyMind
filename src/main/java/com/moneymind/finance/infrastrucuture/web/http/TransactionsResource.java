@@ -4,6 +4,7 @@ import com.moneymind.finance.adapters.in.web.http.dto.UpdateCategoryRequest;
 import com.moneymind.finance.adapters.in.web.http.hateoas.Link;
 import com.moneymind.finance.domain.PagedResult;
 import com.moneymind.finance.domain.core.ClassifiedFinancialRecord;
+import com.moneymind.finance.domain.core.TransactionSearchQuery;
 import com.moneymind.finance.domain.transactions.ClassifyTransactions;
 import com.moneymind.finance.domain.transactions.ImportTransactions;
 import com.moneymind.finance.domain.transactions.SearchTransactions;
@@ -53,8 +54,12 @@ public class TransactionsResource {
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.APPLICATION_JSON)
     public Response importTransactions(@RestForm("type") String type, @RestForm("file") InputStream file) throws IOException {
-        this.importTransactions.execute(type, file);
-        return Response.noContent().build();
+        try {
+            List<ClassifiedFinancialRecord> executeRecords = this.importTransactions.execute(type, file);
+            return Response.ok(executeRecords).build();
+        } catch (Exception e) {
+            return Response.serverError().entity(e.getMessage()).build();
+        }
     }
 
     @GET
@@ -64,7 +69,8 @@ public class TransactionsResource {
             @Context UriInfo uriInfo,
             @QueryParam("id") String transactionId,
             @QueryParam("category") String category,
-            @QueryParam("dimension") String dimension,
+            @QueryParam("aggregateByPeriod") String aggregateByPeriod,
+            @QueryParam("aggregateByColumn") String aggregateByColumn,
             @QueryParam("bank") String bank,
             @QueryParam("from") String from,
             @QueryParam("to") String to,
@@ -72,10 +78,20 @@ public class TransactionsResource {
             @QueryParam("cursor") String cursor,
             @QueryParam("sort") String sort
     ) {
-        final PagedResult<FinancialRecord> pagedResult = this.searchTransactions.execute(
-                transactionId, category, dimension, bank, from, to, 100, //TODO: support limit
-                cursor, sort
-        );
+        TransactionSearchQuery query = TransactionSearchQuery.builder()
+                .id(transactionId)
+                .category(category)
+                .aggregateByPeriod(aggregateByPeriod)
+                .aggregateByColumn(aggregateByColumn)
+                .bank(bank)
+                .from(from)
+                .to(to)
+                .limit(100) //TODO: support limit
+                .cursor(cursor)
+                .sort(sort)
+                .build();
+
+        final PagedResult<FinancialRecord> pagedResult = this.searchTransactions.execute(query);
 
         return Response.ok(toPageResponse(pagedResult, uriInfo, transactionId, category, bank, from, to, cursor)).build();
     }
@@ -94,6 +110,28 @@ public class TransactionsResource {
                 "APPLIANCES", "SALARY", "FUN MONEY", "INTERNET", "MOBILE", "TRANSFER BETWEEN ACCOUNTS",
                 "FINANCIAL EXPENSES", "CAR", "GASOLINE", "CAR TOOL"
         )).build();
+    }
+
+    @GET
+    @Path("/expenses")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response search(
+            @Context UriInfo uriInfo,
+            @QueryParam("from") String from,
+            @QueryParam("to") String to,
+            @QueryParam("limit") int limit,
+            @QueryParam("cursor") String cursor
+    ) {
+        TransactionSearchQuery query = TransactionSearchQuery.builder()
+                .from(from)
+                .to(to)
+                .limit(100) //TODO: support limit
+                .cursor(cursor)
+                .build();
+
+        final PagedResult<FinancialRecord> pagedResult = this.searchTransactions.execute(query);
+
+        return Response.ok(toPageResponse(pagedResult, uriInfo, null, null, null, from, to, cursor)).build();
     }
 
     @PUT
@@ -127,10 +165,11 @@ public class TransactionsResource {
     @Path("/export")
     public Response exportTransactions(@QueryParam("format") String format) {
         // Retrieve all transactions using the search method with null parameters
-        final PagedResult<FinancialRecord> pagedResult = this.searchTransactions.execute(
-                null, null, null, null, null, null, 10000, // Large limit to get all transactions
-                null, null
-        );
+        TransactionSearchQuery query = TransactionSearchQuery.builder()
+                .limit(10000) // Large limit to get all transactions
+                .build();
+
+        final PagedResult<FinancialRecord> pagedResult = this.searchTransactions.execute(query);
 
         List<FinancialRecord> transactions = pagedResult.list();
 

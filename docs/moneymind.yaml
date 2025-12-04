@@ -59,14 +59,30 @@ paths:
             type: string
         - name: from
           in: query
-          description: Start date (yyyy-MM-dd)
+          description: Start date (ISO 8601 format, e.g., 2025-01-01T00:00:00Z)
           schema:
             type: string
         - name: to
           in: query
-          description: End date (yyyy-MM-dd)
+          description: End date (ISO 8601 format, e.g., 2025-12-31T23:59:59Z)
           schema:
             type: string
+        - name: aggregateByPeriod
+          in: query
+          description: |
+            Groups and sums transaction values by time period.
+            When set, returns aggregated totals instead of individual transactions.
+          schema:
+            type: string
+            enum: [month, year]
+        - name: aggregateByColumn
+          in: query
+          description: |
+            Groups and sums transaction values by a database column.
+            When set, returns aggregated totals per unique column value instead of individual transactions.
+          schema:
+            type: string
+            enum: [category, bank_name]
         - name: limit
           in: query
           description: Maximum number of transactions to return

@@ -2,8 +2,10 @@ package com.moneymind.finance.infrastrucuture.postgres;
 
 import com.moneymind.finance.domain.PagedResult;
 import com.moneymind.finance.domain.core.FinancialRecord;
+import com.moneymind.finance.domain.core.TransactionSearchQuery;
 import com.moneymind.finance.domain.ports.TransactionRepository;
 import org.jooq.*;
+import org.jooq.Record;
 import org.jooq.exception.IntegrityConstraintViolationException;
 import org.jooq.generated.tables.BankTransaction;
 import org.jooq.generated.tables.records.BankTransactionRecord;
@@ -21,7 +23,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static org.jooq.impl.DSL.sumDistinct;
+import static org.jooq.impl.DSL.sum;
 
 public class TransactionStore extends Store implements TransactionRepository {
 
@@ -66,15 +68,32 @@ public class TransactionStore extends Store implements TransactionRepository {
     }
 
     @Override
-    public void insertTransactions(List<FinancialRecord> financialRecords) {
+    public List<FinancialRecord> insertTransactions(List<FinancialRecord> financialRecords) {
         try {
             final List<BankTransactionRecord> transactionRecords = financialRecords.stream().map(this::toRecord).toList();
 
-            final int[] inserted = dataSource.batchInsert(transactionRecords).execute();
+            // Build multi-row INSERT with RETURNING
+            InsertValuesStep5<BankTransactionRecord, BigDecimal, String, OffsetDateTime, BigDecimal, String> insert = null;
 
-            if (inserted.length != financialRecords.size()) {
-                logger.error("Error occurred on batch financialRecords insert");
+            for (BankTransactionRecord record : transactionRecords) {
+                insert = Objects.requireNonNullElseGet(insert, () -> dataSource.insertInto(BankTransaction.BANK_TRANSACTION,
+                        BankTransaction.BANK_TRANSACTION.VALUE,
+                        BankTransaction.BANK_TRANSACTION.DESCRIPTION,
+                        BankTransaction.BANK_TRANSACTION.DATE,
+                        BankTransaction.BANK_TRANSACTION.BALANCE,
+                        BankTransaction.BANK_TRANSACTION.BANK_NAME)).values(record.getValue(), record.getDescription(), record.getDate(),
+                        record.getBalance(), record.getBankName());
             }
+
+            // Execute with RETURNING to get generated UUIDs
+            assert insert != null;
+            Result<BankTransactionRecord> insertedRecords = insert.returning().fetch();
+
+            // Return the inserted records with generated IDs
+            return insertedRecords.stream()
+                    .map(TransactionStore::toModel)
+                    .collect(Collectors.toList());
+
         } catch (IntegrityConstraintViolationException ex) {
             if (ex.getCause() instanceof BatchUpdateException &&
                     ((PSQLException) ex.getCause().getCause()).getSQLState().equalsIgnoreCase(PLSQL_DUPLICATED_RECORD_ERROR_CODE)) {
@@ -88,70 +107,102 @@ public class TransactionStore extends Store implements TransactionRepository {
                         ex
                 );
             }
+            throw ex;
         }
     }
 
     @Override
-    public PagedResult<FinancialRecord> search(String id, String category, String dimension, String bank,
-                                               String from, String to, int limit, String cursor,
-                                               String sort) {
+    public PagedResult<FinancialRecord> search(final TransactionSearchQuery query) {
+        final int sanitizedLimit = this.sanitizeLimit(query.limit());
+        final int sanitizedCursor = this.sanitizeCursor(query.cursor());
 
-        // TODO: revert his to sanitize
-        final int sanitizedLimit = this.sanitizeLimit(limit);
-        final int sanitizedCursor = this.sanitizeCursor(cursor);
-
-        if(dimension != null && !dimension.isEmpty()) {
-            return searchByDimension(dimension, from, to);
+        // Handle aggregation queries
+        boolean hasGroupByColumn = query.aggregateByColumn() != null && !query.aggregateByColumn().isEmpty();
+        if (query.aggregateByPeriod() != null && !query.aggregateByPeriod().isEmpty()) {
+            if (hasGroupByColumn) {
+                // Both present -> buildAggregatedQuery
+                return buildAggregatedQuery(query);
+            } else {
+                // Only period -> searchByPeriod
+                return searchByPeriod(query);
+            }
+        } else if (hasGroupByColumn) {
+            // Only column -> searchByColumn
+            return searchByColumn(query);
         }
 
-        SelectConditionStep<BankTransactionRecord> where = this.dataSource.
-                selectFrom(BankTransaction.BANK_TRANSACTION)
-                .where(BankTransaction.BANK_TRANSACTION.ID.ge(sanitizedCursor));
+        // Regular search (no aggregation) - Strategy Pattern Implementation
+        QueryContext context = new QueryContext(dataSource, query, sanitizedLimit, sanitizedCursor);
+        RegularSearchStrategy strategy = new RegularSearchStrategy(new QueryBuilderHelper(), new PaginationHandler());
+        return strategy.execute(context);
+    }
 
-        if(id != null && !id.isEmpty()) {
-            where = where.and(BankTransaction.BANK_TRANSACTION.UUID.eq(UUID.fromString(id)));
-        }
+    private PagedResult<FinancialRecord> buildAggregatedQuery(final TransactionSearchQuery query) {
+        // Determine the date truncation based on period (month or year)
+        final String truncation = query.aggregateByPeriod().equalsIgnoreCase("year") ? "year" : "month";
 
-        if(category != null && !category.isEmpty()) {
-            where = where.and(BankTransaction.BANK_TRANSACTION.CATEGORY.eq(category));
-        }
+        final SelectJoinStep<Record4<String, String, BigDecimal, OffsetDateTime>> fromClause = this.dataSource
+                .select(
+                        org.jooq.impl.DSL.field(
+                                "TO_CHAR(DATE_TRUNC('" + truncation + "', {0}), {1})",
+                                String.class,
+                                BankTransaction.BANK_TRANSACTION.DATE,
+                                truncation.equals("year") ? "YYYY" : "YYYY-MM"
+                        ).as("period"),
+                        BankTransaction.BANK_TRANSACTION.CATEGORY,
+                        sum(BankTransaction.BANK_TRANSACTION.VALUE).as("total"),
+                        org.jooq.impl.DSL.max(BankTransaction.BANK_TRANSACTION.DATE).as("max_date")
+                )
+                .from(BankTransaction.BANK_TRANSACTION);
 
-        if(bank != null && !bank.isEmpty()) {
-            where = where.and(BankTransaction.BANK_TRANSACTION.BANK_NAME.eq(bank));
-        }
+        SelectConditionStep<Record4<String, String, BigDecimal, OffsetDateTime>> where =
+                applyDateFilters(fromClause, query.from(), query.to());
+
+        Result<Record4<String, String, BigDecimal, OffsetDateTime>> results = Objects.requireNonNullElse(where, fromClause)
+                .groupBy(
+                        org.jooq.impl.DSL.field("DATE_TRUNC('" + truncation + "', {0})", BankTransaction.BANK_TRANSACTION.DATE),
+                        BankTransaction.BANK_TRANSACTION.CATEGORY
+                )
+                .orderBy(org.jooq.impl.DSL.field("period").asc(), BankTransaction.BANK_TRANSACTION.CATEGORY.asc())
+                .limit(sanitizeLimit(query.limit()) + 1)
+                .fetch();
+
+        List<FinancialRecord> records = results.stream()
+                .map(record -> new FinancialRecord(
+                        record.get("period", String.class),
+                        record.get(BankTransaction.BANK_TRANSACTION.CATEGORY),
+                        record.get("total", BigDecimal.class),
+                        record.get("max_date", OffsetDateTime.class)
+                ))
+                .toList();
+
+        return new PagedResult<>(records, query.limit(), null);
+    }
+
+    private <R extends org.jooq.Record> SelectConditionStep<R> applyDateFilters(
+            SelectJoinStep<R> fromClause,
+            String from,
+            String to
+    ) {
+        SelectConditionStep<R> where = null;
 
         if(from != null && !from.isEmpty()) {
-            where = where.and(BankTransaction.BANK_TRANSACTION.DATE.greaterOrEqual(OffsetDateTime.parse(from)));
-
+            where = fromClause.where(
+                    BankTransaction.BANK_TRANSACTION.DATE.greaterOrEqual(OffsetDateTime.parse(from))
+            );
         }
 
         if(to != null && !to.isEmpty()) {
-            where = where.and(BankTransaction.BANK_TRANSACTION.DATE.lessOrEqual(OffsetDateTime.parse(to)));
-
+            if(where != null) {
+                where = where.and(BankTransaction.BANK_TRANSACTION.DATE.lessOrEqual(OffsetDateTime.parse(to)));
+            } else {
+                where = fromClause.where(
+                        BankTransaction.BANK_TRANSACTION.DATE.lessOrEqual(OffsetDateTime.parse(to))
+                );
+            }
         }
 
-        List<SortField<?>> sortBy = List.of(BankTransaction.BANK_TRANSACTION.DATE.desc(), BankTransaction.BANK_TRANSACTION.ID.desc());
-        if( sort != null && sort.equals("ASC")) {
-            sortBy = List.of(BankTransaction.BANK_TRANSACTION.DATE.asc(),  BankTransaction.BANK_TRANSACTION.ID.asc());
-        }
-
-        final Result<BankTransactionRecord> financialRecords = where.orderBy(sortBy)
-                .limit(sanitizedLimit + 1)
-                .fetch();
-
-        String newCursor = null;
-        boolean hasMoreRecords = !financialRecords.isEmpty() && financialRecords.size() >= sanitizedLimit + 1;
-        if ( hasMoreRecords ) {
-            BankTransactionRecord rec = financialRecords.remove(financialRecords.size() - 1);
-            newCursor = new String(
-                    Base64.getEncoder().encode(String.valueOf(rec.getId()).getBytes(StandardCharsets.UTF_8)));
-        }
-
-        return new PagedResult<>(
-                financialRecords.stream().map(TransactionStore::toModel).collect(Collectors.toList()),
-                sanitizedLimit,
-                newCursor
-        );
+        return where;
     }
 
     @Override
@@ -168,7 +219,7 @@ public class TransactionStore extends Store implements TransactionRepository {
         String newCursor = null;
         boolean hasMoreRecords = !bankTransactionRecords.isEmpty() && bankTransactionRecords.size() >= sanitizedLimit + 1;
         if ( hasMoreRecords ) {
-            BankTransactionRecord rec = bankTransactionRecords.remove(bankTransactionRecords.size() - 1);
+            BankTransactionRecord rec = bankTransactionRecords.removeLast();
             newCursor = new String(
                     Base64.getEncoder().encode(String.valueOf(rec.getId()).getBytes(StandardCharsets.UTF_8)));
         }
@@ -180,46 +231,75 @@ public class TransactionStore extends Store implements TransactionRepository {
         );
     }
 
-    private PagedResult<FinancialRecord> searchByDimension(String dimension, String from, String to) {
+    private PagedResult<FinancialRecord> searchByColumn(TransactionSearchQuery query) {
 
         final SelectJoinStep<Record2<String, BigDecimal>> fromClause = this.dataSource
                 .select(
-                        Objects.requireNonNull(BankTransaction.BANK_TRANSACTION.field(dimension)).cast(String.class),
-                        sumDistinct(BankTransaction.BANK_TRANSACTION.VALUE)
+                        Objects.requireNonNull(BankTransaction.BANK_TRANSACTION.field(query.aggregateByColumn())).cast(String.class),
+                        sum(BankTransaction.BANK_TRANSACTION.VALUE)
                 )
                 .from(BankTransaction.BANK_TRANSACTION);
 
-        SelectConditionStep<Record2<String, BigDecimal>> where = null;
-        if(from != null && !from.isEmpty()) {
-            where = fromClause.where(
-                    BankTransaction.BANK_TRANSACTION.DATE.greaterOrEqual(OffsetDateTime.parse(from))
-            );
-        }
+        SelectConditionStep<Record2<String, BigDecimal>> where = applyDateFilters(fromClause, query.from(), query.to());
 
-        if(to != null && !to.isEmpty()) {
-            if( where != null) {
-                where = where.and(BankTransaction.BANK_TRANSACTION.DATE.lessOrEqual(OffsetDateTime.parse(to)));
-            }else {
-                where = fromClause.where(
-                        BankTransaction.BANK_TRANSACTION.DATE.greaterOrEqual(OffsetDateTime.parse(to))
-                );
-            }
-        }
-
-        Result<Record2<String, BigDecimal>> txByCategory;
-        txByCategory = Objects.requireNonNullElse(where, fromClause)
-                .groupBy(BankTransaction.BANK_TRANSACTION.CATEGORY)
+        Result<Record2<String, BigDecimal>> txByColumn;
+        txByColumn = Objects.requireNonNullElse(where, fromClause)
+                .groupBy(BankTransaction.BANK_TRANSACTION.field(query.aggregateByColumn()))
                 .fetch();
 
-        List<FinancialRecord> records = txByCategory.stream()
+        List<FinancialRecord> records = txByColumn.stream()
                 .map(record -> new FinancialRecord(
                         record.get(0, String.class), record.get(1, BigDecimal.class))
                 ).toList();
 
         return new PagedResult<>(
                 records,
-                100,
-                null
+                query.limit(),
+                null //  TODO: build cursor which is missing
+
+        );
+    }
+
+    private PagedResult<FinancialRecord> searchByPeriod(TransactionSearchQuery query) {
+        final int sanitizedLimit = this.sanitizeLimit(query.limit());
+        final int sanitizedCursor = this.sanitizeCursor(query.cursor()); // TODO: parse cursor
+        // Determine the date truncation based on a period (month or year)
+        final String truncation = query.aggregateByPeriod().equalsIgnoreCase("year") ? "year" : "month";
+
+        final SelectJoinStep<Record2<String, BigDecimal>> fromClause = this.dataSource
+                .select(
+                        org.jooq.impl.DSL.field(
+                                "TO_CHAR(DATE_TRUNC('" + truncation + "', {0}), {1})",
+                                String.class,
+                                BankTransaction.BANK_TRANSACTION.DATE,
+                                truncation.equals("year") ? "YYYY" : "YYYY-MM"
+                        ).as("period"),
+                        sum(BankTransaction.BANK_TRANSACTION.VALUE).as("total")
+                )
+                .from(BankTransaction.BANK_TRANSACTION);
+
+        SelectConditionStep<Record2<String, BigDecimal>> where = applyDateFilters(fromClause, query.from(), query.to());
+
+        Result<Record2<String, BigDecimal>> txByPeriod = Objects.requireNonNullElse(where, fromClause)
+                .groupBy(org.jooq.impl.DSL.field("DATE_TRUNC('" + truncation + "', {0})", BankTransaction.BANK_TRANSACTION.DATE))
+                .orderBy(org.jooq.impl.DSL.field("period").asc())
+                .limit(sanitizedLimit + 1)
+                .fetch();
+
+        String newCursor = null;
+        if(txByPeriod.size() > sanitizedLimit ) {
+            newCursor = buildCursor(txByPeriod.removeLast(), query.aggregateByColumn(), query.aggregateByPeriod());
+        }
+
+        List<FinancialRecord> records = txByPeriod.stream()
+                .map(record -> new FinancialRecord(
+                        record.get("period", String.class), record.get("total", BigDecimal.class))
+                ).toList();
+
+        return new PagedResult<>(
+                records,
+                sanitizedLimit,
+                newCursor
         );
     }
 
@@ -241,6 +321,206 @@ public class TransactionStore extends Store implements TransactionRepository {
             return null;
         }
 
-        return toModel(transactionRecord.get(0));
+        return toModel(transactionRecord.getFirst());
+    }
+
+    private String buildCursor(final Record record, final String aggregatedByColumn, final String aggregatedByPeriod){
+        final boolean hasGroupByColumn = aggregatedByColumn != null && !aggregatedByColumn.isEmpty();
+        final boolean hasGroupByPeriod = aggregatedByPeriod != null && !aggregatedByPeriod.isEmpty();
+
+        if(hasGroupByColumn && hasGroupByPeriod) {
+            return new String(
+                    Base64.getEncoder().encode((record.getValue("period") + "," + record.getValue(BankTransaction.BANK_TRANSACTION.CATEGORY)).getBytes(StandardCharsets.UTF_8)));
+        }
+
+        if(hasGroupByPeriod) {
+            return new String(
+                    Base64.getEncoder().encode(String.valueOf(record.getValue("period")).getBytes(StandardCharsets.UTF_8)));
+        }
+
+        if(hasGroupByColumn) {
+            return new String(
+                    Base64.getEncoder().encode(String.valueOf(record.getValue(BankTransaction.BANK_TRANSACTION.CATEGORY)).getBytes(StandardCharsets.UTF_8)));
+        }
+
+        return new String(
+            Base64.getEncoder().encode((record.getValue(BankTransaction.BANK_TRANSACTION.DATE) + "," + record.getValue(BankTransaction.BANK_TRANSACTION.ID)).getBytes(StandardCharsets.UTF_8)));
+
+    }
+
+    // ========== Refactoring: Value Objects and Helper Classes ==========
+
+    enum AggregationPeriod {
+        YEAR("year", "YYYY"),
+        MONTH("month", "YYYY-MM");
+
+        private final String sqlTruncation;
+        private final String dateFormat;
+
+        AggregationPeriod(String sqlTruncation, String dateFormat) {
+            this.sqlTruncation = sqlTruncation;
+            this.dateFormat = dateFormat;
+        }
+
+        public String getSqlTruncation() {
+            return sqlTruncation;
+        }
+
+        public String getDateFormat() {
+            return dateFormat;
+        }
+
+        public static AggregationPeriod fromString(String period) {
+            if (period == null || period.isEmpty()) {
+                return null;
+            }
+            return period.equalsIgnoreCase("year") ? YEAR : MONTH;
+        }
+    }
+
+    record QueryContext(
+            DSLContext dsl,
+            TransactionSearchQuery query,
+            int sanitizedLimit,
+            int sanitizedCursor
+    ) {}
+
+    static class PaginationHandler {
+        String encodeCursor(String value) {
+            return Base64.getEncoder()
+                    .encodeToString(value.getBytes(StandardCharsets.UTF_8));
+        }
+
+        <R extends Record> PagedResult<FinancialRecord> buildPagedResult(
+                Result<R> results,
+                int limit,
+                java.util.function.Function<R, FinancialRecord> mapper,
+                java.util.function.Function<R, String> cursorBuilder
+        ) {
+            String cursor = null;
+            boolean hasMore = results.size() > limit;
+
+            if (hasMore) {
+                R lastRecord = results.remove(results.size() - 1);
+                cursor = cursorBuilder.apply(lastRecord);
+            }
+
+            List<FinancialRecord> records = results.stream()
+                    .map(mapper)
+                    .collect(Collectors.toList());
+
+            return new PagedResult<>(records, limit, cursor);
+        }
+    }
+
+    static class QueryBuilderHelper {
+        private boolean hasValue(String s) {
+            return s != null && !s.isEmpty();
+        }
+
+        <R extends Record> SelectConditionStep<R> applyDateFilters(
+                SelectJoinStep<R> fromClause,
+                String from,
+                String to
+        ) {
+            SelectConditionStep<R> where = null;
+
+            if(from != null && !from.isEmpty()) {
+                where = fromClause.where(
+                        BankTransaction.BANK_TRANSACTION.DATE.greaterOrEqual(OffsetDateTime.parse(from))
+                );
+            }
+
+            if(to != null && !to.isEmpty()) {
+                if(where != null) {
+                    where = where.and(BankTransaction.BANK_TRANSACTION.DATE.lessOrEqual(OffsetDateTime.parse(to)));
+                } else {
+                    where = fromClause.where(
+                            BankTransaction.BANK_TRANSACTION.DATE.lessOrEqual(OffsetDateTime.parse(to))
+                    );
+                }
+            }
+
+            return where;
+        }
+
+        SelectConditionStep<BankTransactionRecord> applyCommonFilters(
+                SelectConditionStep<BankTransactionRecord> where,
+                TransactionSearchQuery searchQuery
+        ) {
+            if (hasValue(searchQuery.id())) {
+                where = where.and(BankTransaction.BANK_TRANSACTION.UUID.eq(UUID.fromString(searchQuery.id())));
+            }
+            if (hasValue(searchQuery.category())) {
+                where = where.and(BankTransaction.BANK_TRANSACTION.CATEGORY.eq(searchQuery.category()));
+            }
+            if (hasValue(searchQuery.bank())) {
+                where = where.and(BankTransaction.BANK_TRANSACTION.BANK_NAME.eq(searchQuery.bank()));
+            }
+            if (hasValue(searchQuery.from())) {
+                where = where.and(BankTransaction.BANK_TRANSACTION.DATE.greaterOrEqual(OffsetDateTime.parse(searchQuery.from())));
+            }
+            if (hasValue(searchQuery.to())) {
+                where = where.and(BankTransaction.BANK_TRANSACTION.DATE.lessOrEqual(OffsetDateTime.parse(searchQuery.to())));
+            }
+            return where;
+        }
+
+        List<SortField<?>> buildSortFields(String sort) {
+            if (sort != null && sort.equals("ASC")) {
+                return List.of(
+                        BankTransaction.BANK_TRANSACTION.DATE.asc(),
+                        BankTransaction.BANK_TRANSACTION.ID.asc()
+                );
+            }
+            return List.of(
+                    BankTransaction.BANK_TRANSACTION.DATE.desc(),
+                    BankTransaction.BANK_TRANSACTION.ID.desc()
+            );
+        }
+    }
+
+    interface TransactionQueryStrategy {
+        PagedResult<FinancialRecord> execute(QueryContext context);
+        boolean canHandle(TransactionSearchQuery query);
+    }
+
+    static class RegularSearchStrategy implements TransactionQueryStrategy {
+        private final QueryBuilderHelper queryBuilder;
+        private final PaginationHandler paginationHandler;
+
+        RegularSearchStrategy(QueryBuilderHelper queryBuilder, PaginationHandler paginationHandler) {
+            this.queryBuilder = queryBuilder;
+            this.paginationHandler = paginationHandler;
+        }
+
+        @Override
+        public boolean canHandle(TransactionSearchQuery query) {
+            boolean hasGroupByColumn = query.aggregateByColumn() != null && !query.aggregateByColumn().isEmpty();
+            boolean hasGroupByPeriod = query.aggregateByPeriod() != null && !query.aggregateByPeriod().isEmpty();
+            return !hasGroupByColumn && !hasGroupByPeriod;
+        }
+
+        @Override
+        public PagedResult<FinancialRecord> execute(QueryContext ctx) {
+            SelectConditionStep<BankTransactionRecord> where = ctx.dsl()
+                    .selectFrom(BankTransaction.BANK_TRANSACTION)
+                    .where(BankTransaction.BANK_TRANSACTION.ID.ge(ctx.sanitizedCursor()));
+
+            where = queryBuilder.applyCommonFilters(where, ctx.query());
+
+            List<SortField<?>> sortBy = queryBuilder.buildSortFields(ctx.query().sort());
+            Result<BankTransactionRecord> results = where
+                    .orderBy(sortBy)
+                    .limit(ctx.sanitizedLimit() + 1)
+                    .fetch();
+
+            return paginationHandler.buildPagedResult(
+                    results,
+                    ctx.sanitizedLimit(),
+                    TransactionStore::toModel,
+                    rec -> paginationHandler.encodeCursor(String.valueOf(rec.getId()))
+            );
+        }
     }
 }

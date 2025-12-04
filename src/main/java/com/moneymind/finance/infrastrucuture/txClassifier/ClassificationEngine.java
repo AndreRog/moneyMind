@@ -5,6 +5,7 @@ import com.moneymind.classifier.domain.Transaction;
 import com.moneymind.finance.domain.PagedResult;
 import com.moneymind.finance.domain.core.ClassifiedFinancialRecord;
 import com.moneymind.finance.domain.core.FinancialRecord;
+import com.moneymind.finance.domain.core.TransactionSearchQuery;
 import com.moneymind.classifier.ports.Classifier;
 import com.moneymind.finance.domain.ports.TransactionRepository;
 import com.moneymind.finance.infrastrucuture.ports.TransactionClassifier;
@@ -29,8 +30,11 @@ public class ClassificationEngine implements TransactionClassifier {
 
     @Override
     public List<FinancialRecord> classify() {
+        TransactionSearchQuery query = TransactionSearchQuery.builder()
+                .limit(80000)
+                .build();
 
-        PagedResult<FinancialRecord> search = transactionRepository.search(null, null, null, null, null, null, 80000, null, null);
+        PagedResult<FinancialRecord> search = transactionRepository.search(query);
         if (search.list() == null || search.list().isEmpty()) {
             return List.of();
         }
@@ -64,7 +68,7 @@ public class ClassificationEngine implements TransactionClassifier {
         try {
             List<FinancialRecord> list = financialRecords
                     .stream()
-                    .filter(financialRecord -> financialRecord.getCategory() == null || financialRecord.getCategory().isBlank())
+                    .filter(financialRecord -> financialRecord.getCategory() == null || financialRecord.getCategory().isBlank() || "UNCATEGORIZED".equals(financialRecord.getCategory()))
                     .toList();
             List<ClassifiedFinancialRecord> classifiedFinancialRecords = new ArrayList<>();
             for(FinancialRecord record : list) {

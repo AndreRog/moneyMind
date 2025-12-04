@@ -15,7 +15,7 @@
         <quarkus.platform.version>3.25.2</quarkus.platform.version>
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.3.1</surefire-plugin.version>
-        <jooq.version>2.0.0</jooq.version>
+        <jooq.version>2.1.0</jooq.version>
         <org.jooq.version>3.18.7</org.jooq.version>
         <jooq.codegen.sabomichal.version>1.1.1</jooq.codegen.sabomichal.version>
 
