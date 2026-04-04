@@ -2,8 +2,14 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com</groupId>
-    <artifactId>moneyMind</artifactId>
+    <artifactId>moneyMind-parent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>classifier</module>
+        <module>app</module>
+    </modules>
 
     <properties>
         <compiler-plugin.version>3.14.0</compiler-plugin.version>
@@ -15,10 +21,9 @@
         <quarkus.platform.version>3.25.2</quarkus.platform.version>
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.3.1</surefire-plugin.version>
-        <jooq.version>2.0.0</jooq.version>
+        <jooq.version>2.1.0</jooq.version>
         <org.jooq.version>3.18.7</org.jooq.version>
         <jooq.codegen.sabomichal.version>1.1.1</jooq.codegen.sabomichal.version>
-
     </properties>
 
     <dependencyManagement>
@@ -33,239 +38,27 @@
         </dependencies>
     </dependencyManagement>
 
-    <dependencies>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-jackson</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-arc</artifactId>
-        </dependency>
-
-        <!-- Flyway specific dependencies -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-flyway</artifactId>
-        </dependency>
-
-        <!-- JDBC driver dependencies -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-jdbc-postgresql</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>io.quarkiverse.jooq</groupId>
-            <artifactId>quarkus-jooq</artifactId>
-            <version>${jooq.version}</version>
-        </dependency>
-
-        <!-- https://mvnrepository.com/artifact/nz.ac.waikato.cms.weka/weka-dev -->
-        <dependency>
-            <groupId>nz.ac.waikato.cms.weka</groupId>
-            <artifactId>weka-stable</artifactId>
-            <version>3.8.6</version>
-        </dependency>
-
-        <!-- Netlib dependencies to resolve ARPACK/BLAS/LAPACK native library warnings -->
-        <dependency>
-            <groupId>com.github.fommil.netlib</groupId>
-            <artifactId>all</artifactId>
-            <version>1.1.2</version>
-            <type>pom</type>
-        </dependency>
-
-        <!-- https://mvnrepository.com/artifact/org.apache.poi/poi-ooxml -->
-        <dependency>
-            <groupId>org.apache.poi</groupId>
-            <artifactId>poi-ooxml</artifactId>
-            <version>5.2.3</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.opencsv</groupId>
-            <artifactId>opencsv</artifactId>
-            <version>5.9</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.yaml</groupId>
-            <artifactId>snakeyaml</artifactId>
-            <version>1.33</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit5</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-
     <build>
-        <plugins>
-<!--            <plugin>-->
-<!--                <groupId>org.jooq</groupId>-->
-<!--                <artifactId>jooq-codegen-maven</artifactId>-->
-<!--                <version>${org.jooq.version}</version>-->
-<!--                <dependencies>-->
-<!--                    <dependency>-->
-<!--                        <groupId>com.github.sabomichal</groupId>-->
-<!--                        <artifactId>jooq-meta-postgres-flyway</artifactId>-->
-<!--                        <version>${jooq.codegen.sabomichal.version}</version>-->
-<!--                    </dependency>-->
-<!--                </dependencies>-->
-<!--                <executions>-->
-<!--                    <execution>-->
-<!--                        <id>jooq-codegen</id>-->
-<!--                        <phase>generate-sources</phase>-->
-<!--                        <goals>-->
-<!--                            <goal>generate</goal>-->
-<!--                        </goals>-->
-<!--                        <configuration>-->
-<!--                            <generator>-->
-<!--                                <database>-->
-<!--                                    <name>com.github.sabomichal.jooq.PostgresDDLDatabase</name>-->
-<!--                                    <properties>-->
-<!--                                        <property>-->
-<!--                                            <key>dockerImage</key>-->
-<!--                                            <value>postgres:15.4</value>-->
-<!--                                        </property>-->
-<!--                                        <property>-->
-<!--                                            <key>locations</key>-->
-<!--                                            <value>src/main/resources/db/migration</value>-->
-<!--                                        </property>-->
-<!--                                    </properties>-->
-<!--                                    <includes>public.*</includes>-->
-<!--                                    <excludes>flyway_schema_history</excludes>-->
-<!--                                    <inputSchema>public</inputSchema>-->
-<!--                                </database>-->
-<!--                            </generator>-->
-<!--                        </configuration>-->
-<!--                    </execution>-->
-<!--                </executions>-->
-<!--            </plugin>-->
-            <plugin>
-                <groupId>${quarkus.platform.group-id}</groupId>
-                <artifactId>quarkus-maven-plugin</artifactId>
-                <version>${quarkus.platform.version}</version>
-                <extensions>true</extensions>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>build</goal>
-                            <goal>generate-code</goal>
-                            <goal>generate-code-tests</goal>
-                            <goal>native-image-agent</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>${compiler-plugin.version}</version>
-                <configuration>
-                    <parameters>true</parameters>
-                </configuration>
-            </plugin>
-            <plugin>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>${surefire-plugin.version}</version>
-                <configuration>
-                    <systemPropertyVariables>
-                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-                        <maven.home>${maven.home}</maven.home>
-                    </systemPropertyVariables>
-                </configuration>
-            </plugin>
-            <plugin>
-                <artifactId>maven-failsafe-plugin</artifactId>
-                <version>${surefire-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>integration-test</goal>
-                            <goal>verify</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <systemPropertyVariables>
-                        <native.image.path>${project.build.directory}/${project.build.finalName}-runner</native.image.path>
-                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-                        <maven.home>${maven.home}</maven.home>
-                    </systemPropertyVariables>
-                </configuration>
-            </plugin>
-        </plugins>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${compiler-plugin.version}</version>
+                    <configuration>
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${surefire-plugin.version}</version>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                            <maven.home>${maven.home}</maven.home>
+                        </systemPropertyVariables>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
     </build>
-
-    <profiles>
-        <profile>
-            <id>native</id>
-            <activation>
-                <property>
-                    <name>native</name>
-                </property>
-            </activation>
-            <properties>
-                <skipITs>false</skipITs>
-                <quarkus.native.enabled>true</quarkus.native.enabled>
-            </properties>
-        </profile>
-        <profile>
-            <id>jooq</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.jooq</groupId>
-                        <artifactId>jooq-codegen-maven</artifactId>
-                        <version>${org.jooq.version}</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.github.sabomichal</groupId>
-                                <artifactId>jooq-meta-postgres-flyway</artifactId>
-                                <version>${jooq.codegen.sabomichal.version}</version>
-                            </dependency>
-                        </dependencies>
-                        <executions>
-                            <execution>
-                                <id>jooq-codegen</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>generate</goal>
-                                </goals>
-                                <configuration>
-                                    <generator>
-                                        <database>
-                                            <name>com.github.sabomichal.jooq.PostgresDDLDatabase</name>
-                                            <properties>
-                                                <property>
-                                                    <key>dockerImage</key>
-                                                    <value>postgres:15.4</value>
-                                                </property>
-                                                <property>
-                                                    <key>locations</key>
-                                                    <value>src/main/resources/db/migration</value>
-                                                </property>
-                                            </properties>
-                                            <includes>public.*</includes>
-                                            <excludes>flyway_schema_history</excludes>
-                                            <inputSchema>public</inputSchema>
-                                        </database>
-                                    </generator>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 </project>
