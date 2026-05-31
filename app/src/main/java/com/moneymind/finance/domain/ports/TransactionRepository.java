@@ -1,6 +1,7 @@
 package com.moneymind.finance.domain.ports;
 
 import com.moneymind.finance.domain.PagedResult;
+import com.moneymind.finance.domain.core.AggregatedResult;
 import com.moneymind.finance.domain.core.FinancialRecord;
 import com.moneymind.finance.domain.core.TransactionSearchQuery;
 
@@ -14,6 +15,8 @@ public interface TransactionRepository {
     List<FinancialRecord> insertTransactions(final List<FinancialRecord> financialRecords);
 
     PagedResult<FinancialRecord> search(TransactionSearchQuery query);
+
+    PagedResult<AggregatedResult> searchAggregated(TransactionSearchQuery query);
 
     PagedResult<FinancialRecord> fetchNoCategoriesTransaction(int limit, String cursor);
 

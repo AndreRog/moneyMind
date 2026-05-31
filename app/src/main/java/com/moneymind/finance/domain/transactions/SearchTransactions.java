@@ -1,6 +1,7 @@
 package com.moneymind.finance.domain.transactions;
 
 import com.moneymind.finance.domain.PagedResult;
+import com.moneymind.finance.domain.core.AggregatedResult;
 import com.moneymind.finance.domain.core.FinancialRecord;
 import com.moneymind.finance.domain.core.TransactionSearchQuery;
 import com.moneymind.finance.domain.ports.TransactionRepository;
@@ -15,7 +16,11 @@ public class SearchTransactions {
         this.transactionRepository = transactionRepository;
     }
 
-    public PagedResult<FinancialRecord> execute(TransactionSearchQuery query){
+    public PagedResult<FinancialRecord> execute(TransactionSearchQuery query) {
         return this.transactionRepository.search(query);
+    }
+
+    public PagedResult<AggregatedResult> executeAggregated(TransactionSearchQuery query) {
+        return this.transactionRepository.searchAggregated(query);
     }
 }

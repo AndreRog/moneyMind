@@ -28,7 +28,7 @@ public record TransactionSearchQuery(
         private String bank;
         private String from;
         private String to;
-        private int limit = 100;
+        private int limit = 50;
         private String cursor;
         private String sort;
 
