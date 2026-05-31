@@ -1,4 +1,7 @@
 package com.moneymind.finance.infrastructure.web.http.dto;
 
-public record ClassificationRequest(boolean highConfidence, String cursor) {
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record ClassificationRequest(String cursor) {
 }

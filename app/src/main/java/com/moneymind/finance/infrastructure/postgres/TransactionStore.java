@@ -1,6 +1,7 @@
 package com.moneymind.finance.infrastructure.postgres;
 
 import com.moneymind.finance.domain.PagedResult;
+import com.moneymind.finance.domain.core.AggregatedResult;
 import com.moneymind.finance.domain.core.FinancialRecord;
 import com.moneymind.finance.domain.core.TransactionSearchQuery;
 import com.moneymind.finance.domain.ports.TransactionRepository;
@@ -116,49 +117,45 @@ public class TransactionStore extends Store implements TransactionRepository {
         final int sanitizedLimit = this.sanitizeLimit(query.limit());
         final int sanitizedCursor = this.sanitizeCursor(query.cursor());
 
-        // Handle aggregation queries
-        boolean hasGroupByColumn = query.aggregateByColumn() != null && !query.aggregateByColumn().isEmpty();
-        if (query.aggregateByPeriod() != null && !query.aggregateByPeriod().isEmpty()) {
-            if (hasGroupByColumn) {
-                // Both present -> buildAggregatedQuery
-                return buildAggregatedQuery(query);
-            } else {
-                // Only period -> searchByPeriod
-                return searchByPeriod(query);
-            }
-        } else if (hasGroupByColumn) {
-            // Only column -> searchByColumn
-            return searchByColumn(query);
-        }
-
-        // Regular search (no aggregation) - Strategy Pattern Implementation
         QueryContext context = new QueryContext(dataSource, query, sanitizedLimit, sanitizedCursor);
         RegularSearchStrategy strategy = new RegularSearchStrategy(new QueryBuilderHelper(), new PaginationHandler());
         return strategy.execute(context);
     }
 
-    private PagedResult<FinancialRecord> buildAggregatedQuery(final TransactionSearchQuery query) {
-        // Determine the date truncation based on period (month or year)
-        final String truncation = query.aggregateByPeriod().equalsIgnoreCase("year") ? "year" : "month";
+    @Override
+    public PagedResult<AggregatedResult> searchAggregated(final TransactionSearchQuery query) {
+        boolean hasGroupByColumn = query.aggregateByColumn() != null && !query.aggregateByColumn().isEmpty();
+        boolean hasGroupByPeriod = query.aggregateByPeriod() != null && !query.aggregateByPeriod().isEmpty();
 
-        final SelectJoinStep<Record4<String, String, BigDecimal, OffsetDateTime>> fromClause = this.dataSource
+        if (hasGroupByPeriod && hasGroupByColumn) {
+            return buildAggregatedByPeriodAndColumn(query);
+        } else if (hasGroupByPeriod) {
+            return buildAggregatedByPeriod(query);
+        } else {
+            return buildAggregatedByColumn(query);
+        }
+    }
+
+    private PagedResult<AggregatedResult> buildAggregatedByPeriodAndColumn(final TransactionSearchQuery query) {
+        final String truncation = query.aggregateByPeriod().equalsIgnoreCase("year") ? "year" : "month";
+        final String dateFormat = truncation.equals("year") ? "YYYY" : "YYYY-MM";
+
+        final SelectJoinStep<Record3<String, String, BigDecimal>> fromClause = this.dataSource
                 .select(
                         org.jooq.impl.DSL.field(
-                                "TO_CHAR(DATE_TRUNC('" + truncation + "', {0}), {1})",
+                                "TO_CHAR(DATE_TRUNC('" + truncation + "', {0}), '" + dateFormat + "')",
                                 String.class,
-                                BankTransaction.BANK_TRANSACTION.DATE,
-                                truncation.equals("year") ? "YYYY" : "YYYY-MM"
+                                BankTransaction.BANK_TRANSACTION.DATE
                         ).as("period"),
                         BankTransaction.BANK_TRANSACTION.CATEGORY,
-                        sum(BankTransaction.BANK_TRANSACTION.VALUE).as("total"),
-                        org.jooq.impl.DSL.max(BankTransaction.BANK_TRANSACTION.DATE).as("max_date")
+                        sum(BankTransaction.BANK_TRANSACTION.VALUE).as("total")
                 )
                 .from(BankTransaction.BANK_TRANSACTION);
 
-        SelectConditionStep<Record4<String, String, BigDecimal, OffsetDateTime>> where =
+        SelectConditionStep<Record3<String, String, BigDecimal>> where =
                 applyDateFilters(fromClause, query.from(), query.to());
 
-        Result<Record4<String, String, BigDecimal, OffsetDateTime>> results = Objects.requireNonNullElse(where, fromClause)
+        Result<Record3<String, String, BigDecimal>> results = Objects.requireNonNullElse(where, fromClause)
                 .groupBy(
                         org.jooq.impl.DSL.field("DATE_TRUNC('" + truncation + "', {0})", BankTransaction.BANK_TRANSACTION.DATE),
                         BankTransaction.BANK_TRANSACTION.CATEGORY
@@ -167,13 +164,70 @@ public class TransactionStore extends Store implements TransactionRepository {
                 .limit(sanitizeLimit(query.limit()) + 1)
                 .fetch();
 
-        List<FinancialRecord> records = results.stream()
-                .map(record -> new FinancialRecord(
-                        record.get("period", String.class),
-                        record.get(BankTransaction.BANK_TRANSACTION.CATEGORY),
-                        record.get("total", BigDecimal.class),
-                        record.get("max_date", OffsetDateTime.class)
+        List<AggregatedResult> records = results.stream()
+                .map(r -> new AggregatedResult(
+                        r.get("period", String.class),
+                        r.get(BankTransaction.BANK_TRANSACTION.CATEGORY),
+                        r.get("total", BigDecimal.class)
                 ))
+                .toList();
+
+        return new PagedResult<>(records, query.limit(), null);
+    }
+
+    private PagedResult<AggregatedResult> buildAggregatedByPeriod(final TransactionSearchQuery query) {
+        final int sanitizedLimit = this.sanitizeLimit(query.limit());
+        final String truncation = query.aggregateByPeriod().equalsIgnoreCase("year") ? "year" : "month";
+        final String dateFormat = truncation.equals("year") ? "YYYY" : "YYYY-MM";
+
+        final SelectJoinStep<Record2<String, BigDecimal>> fromClause = this.dataSource
+                .select(
+                        org.jooq.impl.DSL.field(
+                                "TO_CHAR(DATE_TRUNC('" + truncation + "', {0}), '" + dateFormat + "')",
+                                String.class,
+                                BankTransaction.BANK_TRANSACTION.DATE
+                        ).as("period"),
+                        sum(BankTransaction.BANK_TRANSACTION.VALUE).as("total")
+                )
+                .from(BankTransaction.BANK_TRANSACTION);
+
+        SelectConditionStep<Record2<String, BigDecimal>> where = applyDateFilters(fromClause, query.from(), query.to());
+
+        Result<Record2<String, BigDecimal>> results = Objects.requireNonNullElse(where, fromClause)
+                .groupBy(org.jooq.impl.DSL.field("DATE_TRUNC('" + truncation + "', {0})", BankTransaction.BANK_TRANSACTION.DATE))
+                .orderBy(org.jooq.impl.DSL.field("period").asc())
+                .limit(sanitizedLimit + 1)
+                .fetch();
+
+        String newCursor = null;
+        if (results.size() > sanitizedLimit) {
+            Record2<String, BigDecimal> last = results.removeLast();
+            newCursor = buildCursor(last, null, query.aggregateByPeriod());
+        }
+
+        List<AggregatedResult> records = results.stream()
+                .map(r -> new AggregatedResult(r.get("period", String.class), null, r.get("total", BigDecimal.class)))
+                .toList();
+
+        return new PagedResult<>(records, sanitizedLimit, newCursor);
+    }
+
+    private PagedResult<AggregatedResult> buildAggregatedByColumn(final TransactionSearchQuery query) {
+        final SelectJoinStep<Record2<String, BigDecimal>> fromClause = this.dataSource
+                .select(
+                        Objects.requireNonNull(BankTransaction.BANK_TRANSACTION.field(query.aggregateByColumn())).cast(String.class),
+                        sum(BankTransaction.BANK_TRANSACTION.VALUE).as("total")
+                )
+                .from(BankTransaction.BANK_TRANSACTION);
+
+        SelectConditionStep<Record2<String, BigDecimal>> where = applyDateFilters(fromClause, query.from(), query.to());
+
+        Result<Record2<String, BigDecimal>> results = Objects.requireNonNullElse(where, fromClause)
+                .groupBy(BankTransaction.BANK_TRANSACTION.field(query.aggregateByColumn()))
+                .fetch();
+
+        List<AggregatedResult> records = results.stream()
+                .map(r -> new AggregatedResult(null, r.get(0, String.class), r.get("total", BigDecimal.class)))
                 .toList();
 
         return new PagedResult<>(records, query.limit(), null);
@@ -226,78 +280,6 @@ public class TransactionStore extends Store implements TransactionRepository {
 
         return new PagedResult<>(
                 bankTransactionRecords.stream().map(TransactionStore::toModel).collect(Collectors.toList()),
-                sanitizedLimit,
-                newCursor
-        );
-    }
-
-    private PagedResult<FinancialRecord> searchByColumn(TransactionSearchQuery query) {
-
-        final SelectJoinStep<Record2<String, BigDecimal>> fromClause = this.dataSource
-                .select(
-                        Objects.requireNonNull(BankTransaction.BANK_TRANSACTION.field(query.aggregateByColumn())).cast(String.class),
-                        sum(BankTransaction.BANK_TRANSACTION.VALUE)
-                )
-                .from(BankTransaction.BANK_TRANSACTION);
-
-        SelectConditionStep<Record2<String, BigDecimal>> where = applyDateFilters(fromClause, query.from(), query.to());
-
-        Result<Record2<String, BigDecimal>> txByColumn;
-        txByColumn = Objects.requireNonNullElse(where, fromClause)
-                .groupBy(BankTransaction.BANK_TRANSACTION.field(query.aggregateByColumn()))
-                .fetch();
-
-        List<FinancialRecord> records = txByColumn.stream()
-                .map(record -> new FinancialRecord(
-                        record.get(0, String.class), record.get(1, BigDecimal.class))
-                ).toList();
-
-        return new PagedResult<>(
-                records,
-                query.limit(),
-                null //  TODO: build cursor which is missing
-
-        );
-    }
-
-    private PagedResult<FinancialRecord> searchByPeriod(TransactionSearchQuery query) {
-        final int sanitizedLimit = this.sanitizeLimit(query.limit());
-        final int sanitizedCursor = this.sanitizeCursor(query.cursor()); // TODO: parse cursor
-        // Determine the date truncation based on a period (month or year)
-        final String truncation = query.aggregateByPeriod().equalsIgnoreCase("year") ? "year" : "month";
-
-        final SelectJoinStep<Record2<String, BigDecimal>> fromClause = this.dataSource
-                .select(
-                        org.jooq.impl.DSL.field(
-                                "TO_CHAR(DATE_TRUNC('" + truncation + "', {0}), {1})",
-                                String.class,
-                                BankTransaction.BANK_TRANSACTION.DATE,
-                                truncation.equals("year") ? "YYYY" : "YYYY-MM"
-                        ).as("period"),
-                        sum(BankTransaction.BANK_TRANSACTION.VALUE).as("total")
-                )
-                .from(BankTransaction.BANK_TRANSACTION);
-
-        SelectConditionStep<Record2<String, BigDecimal>> where = applyDateFilters(fromClause, query.from(), query.to());
-
-        Result<Record2<String, BigDecimal>> txByPeriod = Objects.requireNonNullElse(where, fromClause)
-                .groupBy(org.jooq.impl.DSL.field("DATE_TRUNC('" + truncation + "', {0})", BankTransaction.BANK_TRANSACTION.DATE))
-                .orderBy(org.jooq.impl.DSL.field("period").asc())
-                .limit(sanitizedLimit + 1)
-                .fetch();
-
-        String newCursor = null;
-        if(txByPeriod.size() > sanitizedLimit ) {
-            newCursor = buildCursor(txByPeriod.removeLast(), query.aggregateByColumn(), query.aggregateByPeriod());
-        }
-
-        List<FinancialRecord> records = txByPeriod.stream()
-                .map(record -> new FinancialRecord(
-                        record.get("period", String.class), record.get("total", BigDecimal.class))
-                ).toList();
-
-        return new PagedResult<>(
-                records,
                 sanitizedLimit,
                 newCursor
         );
@@ -462,6 +444,9 @@ public class TransactionStore extends Store implements TransactionRepository {
             }
             if (hasValue(searchQuery.to())) {
                 where = where.and(BankTransaction.BANK_TRANSACTION.DATE.lessOrEqual(OffsetDateTime.parse(searchQuery.to())));
+            }
+            if (searchQuery.excludeCategories() != null && !searchQuery.excludeCategories().isEmpty()) {
+                where = where.and(BankTransaction.BANK_TRANSACTION.CATEGORY.notIn(searchQuery.excludeCategories()));
             }
             return where;
         }

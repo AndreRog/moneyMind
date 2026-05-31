@@ -7,6 +7,7 @@ import com.moneymind.finance.domain.ports.TransactionClassifier;
 import com.moneymind.finance.domain.ports.TransactionRepository;
 import com.moneymind.finance.domain.ports.TransactionsParser;
 import com.moneymind.finance.domain.transactions.ClassifyTransactions;
+import com.moneymind.finance.domain.transactions.GetTransaction;
 import com.moneymind.finance.domain.transactions.ImportTransactions;
 import com.moneymind.finance.domain.transactions.SearchTransactions;
 import com.moneymind.finance.domain.transactions.UpdateTransactions;
@@ -53,6 +54,12 @@ public class DI {
     @Produces
     SearchTransactions searchTransactions(final TransactionRepository transactionRepository) {
         return new SearchTransactions(transactionRepository);
+    }
+
+    @ApplicationScoped
+    @Produces
+    GetTransaction getTransaction(final TransactionRepository transactionRepository) {
+        return new GetTransaction(transactionRepository);
     }
 
     @ApplicationScoped
