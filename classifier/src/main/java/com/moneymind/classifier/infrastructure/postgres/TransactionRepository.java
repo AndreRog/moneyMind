@@ -8,8 +8,8 @@ import org.jooq.Result;
 import org.jooq.SelectConditionStep;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.stream.Stream;
 
 public class TransactionRepository implements TrainingDataService {
 
@@ -27,8 +27,13 @@ public class TransactionRepository implements TrainingDataService {
                 new Transaction(
                         record.get("description", String.class),
                         record.get("category", String.class),
-                        record.get("value", BigDecimal.class)
+                        record.get("value", BigDecimal.class),
+                        toLocalDate(record.get("date", OffsetDateTime.class))
                 )).toList();
         return list;
+    }
+
+    private static java.time.LocalDate toLocalDate(OffsetDateTime date) {
+        return date == null ? null : date.toLocalDate();
     }
 }

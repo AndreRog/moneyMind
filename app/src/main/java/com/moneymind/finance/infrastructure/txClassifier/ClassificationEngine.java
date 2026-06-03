@@ -83,6 +83,10 @@ public class ClassificationEngine implements TransactionClassifier {
     }
 
     private Transaction mapToTransaction(final FinancialRecord financialRecord) {
-        return new Transaction(financialRecord.getDescription(), financialRecord.getCategory(), financialRecord.getAmount());
+        return new Transaction(
+                financialRecord.getDescription(),
+                financialRecord.getCategory(),
+                financialRecord.getAmount(),
+                financialRecord.getDate() == null ? null : financialRecord.getDate().toLocalDate());
     }
 }

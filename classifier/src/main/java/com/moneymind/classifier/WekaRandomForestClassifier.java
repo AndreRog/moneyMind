@@ -1,29 +1,31 @@
 package com.moneymind.classifier;
 
 import com.moneymind.classifier.domain.ClassificationResult;
+import com.moneymind.classifier.domain.FeatureExtractor;
 import com.moneymind.classifier.domain.Transaction;
-import com.moneymind.classifier.domain.PartialTransaction;
 import com.moneymind.classifier.ports.Classifier;
 import com.moneymind.classifier.ports.TrainingDataService;
 import weka.classifiers.trees.RandomForest;
 import weka.core.*;
 
 import java.util.*;
-import java.util.stream.IntStream;
 
 /**
- * Vibe coded
+ * Weka RandomForest classifier wired to the pure {@link FeatureExtractor} (ADR-0001): it trains
+ * and predicts on TF-IDF(description) + a nominal bucketed amount range + a nominal day-of-month
+ * period — never exact amounts or dates.
  */
 public class WekaRandomForestClassifier implements Classifier {
     private static final int MIN_TRAINING_SAMPLES = 10;
     private static final double MIN_CONFIDENCE_THRESHOLD = 0.6;
 
     private final TrainingDataService trainingDataService;
+    private final FeatureExtractor featureExtractor;
     private RandomForest model;
     private String[] categoryLabels;
     private Map<String, Integer> categoryToIndex;
     private Map<String, Double> wordFeatures;
-    private double minAmount, maxAmount;
+    private List<String> vocabulary;
 
     public WekaRandomForestClassifier(TrainingDataService trainingDataService) throws Exception {
         // Ensure headless mode for server environments
@@ -31,6 +33,7 @@ public class WekaRandomForestClassifier implements Classifier {
 
         WekaPackageManager.loadPackages(false);
         this.trainingDataService = trainingDataService;
+        this.featureExtractor = new FeatureExtractor();
         this.categoryToIndex = new HashMap<>();
         trainModel();
     }
@@ -42,11 +45,9 @@ public class WekaRandomForestClassifier implements Classifier {
             throw new IllegalStateException("Insufficient training data. Need at least " + MIN_TRAINING_SAMPLES + " samples");
         }
 
-        // Build vocabulary from training data
+        // Build vocabulary (idf weights) from training data, keeping a stable word ordering
         this.wordFeatures = buildVocabulary(trainingData);
-
-        // Prepare features
-        double[][] features = extractFeatures(trainingData);
+        this.vocabulary = new ArrayList<>(wordFeatures.keySet());
 
         // Prepare labels
         Set<String> uniqueCategories = new HashSet<>();
@@ -55,23 +56,16 @@ public class WekaRandomForestClassifier implements Classifier {
         this.categoryLabels = uniqueCategories.toArray(new String[0]);
         Arrays.sort(categoryLabels); // Ensure consistent ordering
 
+        categoryToIndex.clear();
         for (int i = 0; i < categoryLabels.length; i++) {
             categoryToIndex.put(categoryLabels[i], i);
         }
 
-        int[] labels = trainingData.stream()
-                .mapToInt(t -> categoryToIndex.get(t.category()))
-                .toArray();
-
-        // Calculate amount range for normalization
-        List<Double> amounts = trainingData.stream()
-                .map(t -> t.amount().doubleValue())
-                .toList();
-        this.minAmount = amounts.stream().mapToDouble(Double::doubleValue).min().orElse(0.0);
-        this.maxAmount = amounts.stream().mapToDouble(Double::doubleValue).max().orElse(1.0);
-
-        // Create Weka Instances for training
-        Instances trainingInstances = createWekaInstances(features, labels, true);
+        // Create Weka Instances for training (one row per labeled transaction)
+        Instances trainingInstances = newInstances(true);
+        for (Transaction transaction : trainingData) {
+            addInstance(trainingInstances, transaction, transaction.category());
+        }
 
         // Train Weka RandomForest classifier
         this.model = new RandomForest();
@@ -87,14 +81,14 @@ public class WekaRandomForestClassifier implements Classifier {
 
         // Count word frequencies
         for (Transaction transaction : transactions) {
-            Set<String> words = extractWords(transaction.description());
+            Set<String> words = featureExtractor.tokens(transaction.description());
             for (String word : words) {
                 wordCount.put(word, wordCount.getOrDefault(word, 0) + 1);
             }
         }
 
-        // Calculate TF-IDF weights for top words
-        Map<String, Double> vocabulary = new HashMap<>();
+        // Calculate TF-IDF weights for top words, preserving insertion order for stable indexing
+        Map<String, Double> vocabulary = new LinkedHashMap<>();
         wordCount.entrySet().stream()
                 .filter(entry -> entry.getValue() > 1) // Filter rare words
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
@@ -107,87 +101,48 @@ public class WekaRandomForestClassifier implements Classifier {
         return vocabulary;
     }
 
-    private Set<String> extractWords(String description) {
-        Set<String> words = new HashSet<>();
-        String[] tokens = description.toLowerCase()
-                .replaceAll("[^a-zA-Z0-9\\s]", " ")
-                .split("\\s+");
-
-        for (String token : tokens) {
-            if (token.length() > 2) { // Filter short words
-                words.add(token);
-            }
-        }
-        return words;
-    }
-
-    private double[][] extractFeatures(List<Transaction> transactions) {
-        int numFeatures = wordFeatures.size() + 1; // +1 for amount
-        double[][] features = new double[transactions.size()][numFeatures];
-
-        for (int i = 0; i < transactions.size(); i++) {
-            Transaction transaction = transactions.get(i);
-
-            // Text features using TF-IDF
-            Set<String> words = extractWords(transaction.description());
-            int featureIndex = 0;
-            for (String word : wordFeatures.keySet()) {
-                double tf = words.contains(word) ? 1.0 : 0.0;
-                double idf = wordFeatures.get(word);
-                features[i][featureIndex] = tf * idf;
-                featureIndex++;
-            }
-
-            // Amount feature (normalized)
-            double normalizedAmount = (transaction.amount().doubleValue() - minAmount) /
-                                    (maxAmount - minAmount + 1e-6); // Avoid division by zero
-            features[i][featureIndex] = normalizedAmount;
-        }
-
-        return features;
-    }
-
-    private Instances createWekaInstances(double[][] features, int[] labels, boolean withLabels) {
-        // Create attribute list
+    /** Attribute layout: word_0..word_n (numeric tf-idf), amount_bucket (nominal), period (nominal), [class]. */
+    private Instances newInstances(boolean withLabels) {
         ArrayList<Attribute> attributes = new ArrayList<>();
 
-        // Add feature attributes
-        for (int i = 0; i < wordFeatures.size(); i++) {
+        for (int i = 0; i < vocabulary.size(); i++) {
             attributes.add(new Attribute("word_" + i));
         }
-        attributes.add(new Attribute("amount"));
+        attributes.add(new Attribute("amount_bucket", FeatureExtractor.AMOUNT_BUCKETS));
+        attributes.add(new Attribute("period", FeatureExtractor.PERIODS));
 
-        // Add class attribute if needed
         if (withLabels) {
-            ArrayList<String> classValues = new ArrayList<>(Arrays.asList(categoryLabels));
-            attributes.add(new Attribute("class", classValues));
+            attributes.add(new Attribute("class", new ArrayList<>(Arrays.asList(categoryLabels))));
         }
 
-        // Create instances
-        Instances instances = new Instances("TransactionClassification", attributes, features.length);
+        Instances instances = new Instances("TransactionClassification", attributes, 0);
         if (withLabels) {
             instances.setClassIndex(instances.numAttributes() - 1);
         }
+        return instances;
+    }
 
-        // Add data
-        for (int i = 0; i < features.length; i++) {
-            Instance instance = new DenseInstance(attributes.size());
-            instance.setDataset(instances);
+    /** Builds a feature row for the transaction and appends it to {@code dataset}. */
+    private void addInstance(Instances dataset, Transaction transaction, String label) {
+        Instance instance = new DenseInstance(dataset.numAttributes());
+        instance.setDataset(dataset);
 
-            // Set feature values
-            for (int j = 0; j < features[i].length; j++) {
-                instance.setValue(j, features[i][j]);
-            }
-
-            // Set class value if provided
-            if (withLabels) {
-                instance.setValue(instances.classIndex(), categoryLabels[labels[i]]);
-            }
-
-            instances.add(instance);
+        Set<String> tokens = featureExtractor.tokens(transaction.description());
+        for (int i = 0; i < vocabulary.size(); i++) {
+            String word = vocabulary.get(i);
+            double tf = tokens.contains(word) ? 1.0 : 0.0;
+            instance.setValue(i, tf * wordFeatures.get(word));
         }
 
-        return instances;
+        int bucketIndex = vocabulary.size();
+        instance.setValue(dataset.attribute(bucketIndex), featureExtractor.amountBucket(transaction.amount()));
+        instance.setValue(dataset.attribute(bucketIndex + 1), featureExtractor.period(transaction.date()));
+
+        if (label != null && dataset.classIndex() >= 0) {
+            instance.setValue(dataset.classIndex(), label);
+        }
+
+        dataset.add(instance);
     }
 
     private WekaResult categorizeWithConfidence(Transaction transaction) throws Exception {
@@ -195,36 +150,9 @@ public class WekaRandomForestClassifier implements Classifier {
             throw new IllegalStateException("Model not trained");
         }
 
-        // Extract features for the transaction
-        double[] transactionFeatures = extractFeatures(transaction);
-
-        // Create Weka instance for prediction (add dummy class attribute)
-        ArrayList<Attribute> attributes = new ArrayList<>();
-
-        // Add feature attributes
-        for (int i = 0; i < wordFeatures.size(); i++) {
-            attributes.add(new Attribute("word_" + i));
-        }
-        attributes.add(new Attribute("amount"));
-
-        // Add class attribute
-        ArrayList<String> classValues = new ArrayList<>(Arrays.asList(categoryLabels));
-        attributes.add(new Attribute("class", classValues));
-
-        Instances predictionInstances = new Instances("TransactionClassification", attributes, 1);
-        predictionInstances.setClassIndex(predictionInstances.numAttributes() - 1);
-
-        Instance instance = new DenseInstance(attributes.size());
-        instance.setDataset(predictionInstances);
-
-        // Set feature values
-        for (int j = 0; j < transactionFeatures.length; j++) {
-            instance.setValue(j, transactionFeatures[j]);
-        }
-        // Class value will be missing for prediction
-
-        predictionInstances.add(instance);
-        instance = predictionInstances.firstInstance();
+        Instances predictionInstances = newInstances(true);
+        addInstance(predictionInstances, transaction, null); // class value left missing
+        Instance instance = predictionInstances.firstInstance();
 
         // Get prediction from RandomForest
         double predictedIndex = model.classifyInstance(instance);
@@ -238,28 +166,6 @@ public class WekaRandomForestClassifier implements Classifier {
         boolean isHighConfidence = confidence >= MIN_CONFIDENCE_THRESHOLD;
 
         return new WekaResult(predictedCategory, confidence, isHighConfidence);
-    }
-
-    private double[] extractFeatures(Transaction transaction) {
-        int numFeatures = wordFeatures.size() + 1;
-        double[] features = new double[numFeatures];
-
-        // Text features using TF-IDF
-        Set<String> words = extractWords(transaction.description());
-        int featureIndex = 0;
-        for (String word : wordFeatures.keySet()) {
-            double tf = words.contains(word) ? 1.0 : 0.0;
-            double idf = wordFeatures.get(word);
-            features[featureIndex] = tf * idf;
-            featureIndex++;
-        }
-
-        // Amount feature (normalized)
-        double normalizedAmount = (transaction.amount().doubleValue() - minAmount) /
-                                (maxAmount - minAmount + 1e-6); // Avoid division by zero
-        features[featureIndex] = normalizedAmount;
-
-        return features;
     }
 
     public void retrainModel() throws Exception {
