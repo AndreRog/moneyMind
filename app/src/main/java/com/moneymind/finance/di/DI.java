@@ -2,7 +2,9 @@ package com.moneymind.finance.di;
 
 import com.moneymind.classifier.ports.Classifier;
 import com.moneymind.finance.domain.banks.ListBanks;
+import com.moneymind.finance.domain.categories.ListCategories;
 import com.moneymind.finance.domain.ports.BankRegistry;
+import com.moneymind.finance.domain.ports.CategoryRepository;
 import com.moneymind.finance.domain.ports.TransactionClassifier;
 import com.moneymind.finance.domain.ports.TransactionRepository;
 import com.moneymind.finance.domain.ports.TransactionsParser;
@@ -12,6 +14,7 @@ import com.moneymind.finance.domain.transactions.ImportTransactions;
 import com.moneymind.finance.domain.transactions.SearchTransactions;
 import com.moneymind.finance.domain.transactions.UpdateTransactions;
 import com.moneymind.finance.infrastructure.file.TransactionsParserFactory;
+import com.moneymind.finance.infrastructure.postgres.CategoryStore;
 import com.moneymind.finance.infrastructure.postgres.TransactionStore;
 import com.moneymind.finance.infrastructure.txClassifier.ClassificationEngine;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -34,6 +37,18 @@ public class DI {
     @Produces
     TransactionRepository transactionRepository(final DSLContext dataSource) {
         return new TransactionStore(dataSource);
+    }
+
+    @ApplicationScoped
+    @Produces
+    CategoryRepository categoryRepository(final DSLContext dataSource) {
+        return new CategoryStore(dataSource);
+    }
+
+    @ApplicationScoped
+    @Produces
+    ListCategories listCategories(final CategoryRepository categoryRepository) {
+        return new ListCategories(categoryRepository);
     }
 
     @ApplicationScoped

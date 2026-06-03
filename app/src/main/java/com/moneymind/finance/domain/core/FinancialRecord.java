@@ -28,7 +28,7 @@ public class FinancialRecord {
         this.description = description;
         this.amount = amount;
         this.finalBalance = finalBalance;
-        this.category = String.valueOf(Category.UNCATEGORIZED);  // default
+        this.category = Category.UNCATEGORIZED;
     }
 
     public FinancialRecord(String category, BigDecimal amount) {
