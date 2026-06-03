@@ -23,7 +23,8 @@ import java.io.InputStream;
 @Path("/guest")
 public class GuestResource {
 
-    private final Logger LOG = Logger.getLogger(GuestResource.class);
+    private static final int HTTP_UNPROCESSABLE_ENTITY = 422;
+    private static final Logger LOG = Logger.getLogger(GuestResource.class);
 
     private final GuestImport guestImport;
 
@@ -40,13 +41,13 @@ public class GuestResource {
             final GuestReview review = guestImport.execute(file);
             return Response.ok(review).build();
         } catch (UnsupportedBankException e) {
-            return Response.status(422) // Unprocessable Entity
+            return Response.status(HTTP_UNPROCESSABLE_ENTITY)
                     .entity(new GuestImportError("UNSUPPORTED_BANK", e.getMessage()))
                     .build();
         } catch (Exception e) {
             LOG.error("Guest import failed", e);
             return Response.serverError()
-                    .entity(new GuestImportError("IMPORT_FAILED", e.getMessage()))
+                    .entity(new GuestImportError("IMPORT_FAILED", "Could not process the uploaded file"))
                     .build();
         }
     }

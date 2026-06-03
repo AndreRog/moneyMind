@@ -133,6 +133,7 @@ public class GuestImport {
 
     private Map<String, Resolved> resolveCategoryTypes() {
         final Map<String, Resolved> bySubcategory = new LinkedHashMap<>();
+        // null userId → system/global categories (not user-scoped)
         for (Category category : categoryRepository.findCategories(null)) {
             for (Category sub : category.subcategories()) {
                 bySubcategory.put(sub.name(), new Resolved(category.name(), sub.type()));

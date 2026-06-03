@@ -100,10 +100,17 @@ public class DI {
 
     @ApplicationScoped
     @Produces
+    SummaryEngine summaryEngine() {
+        return new SummaryEngine();
+    }
+
+    @ApplicationScoped
+    @Produces
     GuestImport guestImport(final BankRegistry bankRegistry,
                             final TransactionClassifier transactionClassifier,
-                            final CategoryRepository categoryRepository) {
-        return new GuestImport(bankRegistry, transactionClassifier, categoryRepository, new SummaryEngine());
+                            final CategoryRepository categoryRepository,
+                            final SummaryEngine summaryEngine) {
+        return new GuestImport(bankRegistry, transactionClassifier, categoryRepository, summaryEngine);
     }
 
     @ApplicationScoped

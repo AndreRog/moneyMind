@@ -66,7 +66,7 @@ class GuestImportTest {
         assertAmount("2450.00", may.income());
         assertAmount("813.15", may.expense());
         assertAmount("1636.85", may.savings());
-        assertEquals(3, may.transactionCount());
+        assertEquals(3, may.countedTransactions());
     }
 
     @Test
@@ -87,7 +87,7 @@ class GuestImportTest {
         assertAmount("750.00", may.expense());
         assertAmount("1700.00", may.savings());
         assertEquals(1, may.excludedCount());
-        assertEquals(2, may.transactionCount());
+        assertEquals(2, may.countedTransactions());
         assertTrue(may.categories().stream().noneMatch(c -> c.name().equals("TRANSFERS")),
                 "EXCLUDED categories must never appear in the breakdown");
     }
