@@ -3,6 +3,8 @@ package com.moneymind.finance.di;
 import com.moneymind.classifier.ports.Classifier;
 import com.moneymind.finance.domain.banks.ListBanks;
 import com.moneymind.finance.domain.categories.ListCategories;
+import com.moneymind.finance.domain.guest.GuestImport;
+import com.moneymind.finance.domain.summary.SummaryEngine;
 import com.moneymind.finance.domain.ports.BankRegistry;
 import com.moneymind.finance.domain.ports.CategoryRepository;
 import com.moneymind.finance.domain.ports.TransactionClassifier;
@@ -94,6 +96,21 @@ public class DI {
     ClassifyTransactions classifyTransactions(final TransactionClassifier transactionClassifier,
                                               final TransactionRepository transactionRepository) {
         return new ClassifyTransactions(transactionClassifier, transactionRepository);
+    }
+
+    @ApplicationScoped
+    @Produces
+    SummaryEngine summaryEngine() {
+        return new SummaryEngine();
+    }
+
+    @ApplicationScoped
+    @Produces
+    GuestImport guestImport(final BankRegistry bankRegistry,
+                            final TransactionClassifier transactionClassifier,
+                            final CategoryRepository categoryRepository,
+                            final SummaryEngine summaryEngine) {
+        return new GuestImport(bankRegistry, transactionClassifier, categoryRepository, summaryEngine);
     }
 
     @ApplicationScoped
