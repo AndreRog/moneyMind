@@ -10,9 +10,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
-final class PostgresTestContainer {
+public final class PostgresTestContainer {
 
-    static final DSLContext DSL_CTX;
+    public static final DSLContext DSL_CTX;
 
     private static final PostgreSQLContainer<?> POSTGRES;
 
