@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Tag("integration")
-abstract class PersistenceHarness {
+public abstract class PersistenceHarness {
 
     protected static final DSLContext dsl = PostgresTestContainer.DSL_CTX;
 
