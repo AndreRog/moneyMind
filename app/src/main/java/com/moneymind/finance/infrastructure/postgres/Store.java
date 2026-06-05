@@ -1,6 +1,6 @@
 package com.moneymind.finance.infrastructure.postgres;
 
-import java.util.Base64;
+import com.moneymind.finance.domain.core.Cursor;
 
 public class Store {
 
@@ -12,19 +12,11 @@ public class Store {
     }
 
     public int sanitizeCursor(String inputCursor) {
-        int cursor = 0;
-
-        if(inputCursor != null) {
-            try {
-                cursor = Integer.parseInt(new String(Base64.getDecoder().decode(inputCursor)));
-            } catch (Exception ex){
-                throw new StoreException(
-                        ExceptionCode.INVALID_PARAM,
-                        ex);
-            }
+        try {
+            return Cursor.decodeId(inputCursor);
+        } catch (Exception ex) {
+            throw new StoreException(ExceptionCode.INVALID_PARAM, ex);
         }
-
-        return Math.max(cursor, 0);
     }
 
 }

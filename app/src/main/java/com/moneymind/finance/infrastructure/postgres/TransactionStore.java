@@ -14,11 +14,11 @@ import org.postgresql.util.PSQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.moneymind.finance.domain.core.Cursor;
+
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.sql.BatchUpdateException;
 import java.time.OffsetDateTime;
-import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -274,8 +274,7 @@ public class TransactionStore extends Store implements TransactionRepository {
         boolean hasMoreRecords = !bankTransactionRecords.isEmpty() && bankTransactionRecords.size() >= sanitizedLimit + 1;
         if ( hasMoreRecords ) {
             BankTransactionRecord rec = bankTransactionRecords.removeLast();
-            newCursor = new String(
-                    Base64.getEncoder().encode(String.valueOf(rec.getId()).getBytes(StandardCharsets.UTF_8)));
+            newCursor = Cursor.forId(rec.getId());
         }
 
         return new PagedResult<>(
@@ -310,24 +309,23 @@ public class TransactionStore extends Store implements TransactionRepository {
         final boolean hasGroupByColumn = aggregatedByColumn != null && !aggregatedByColumn.isEmpty();
         final boolean hasGroupByPeriod = aggregatedByPeriod != null && !aggregatedByPeriod.isEmpty();
 
-        if(hasGroupByColumn && hasGroupByPeriod) {
-            return new String(
-                    Base64.getEncoder().encode((record.getValue("period") + "," + record.getValue(BankTransaction.BANK_TRANSACTION.CATEGORY)).getBytes(StandardCharsets.UTF_8)));
+        if (hasGroupByColumn && hasGroupByPeriod) {
+            return Cursor.forPeriodAndColumn(
+                    record.getValue("period", String.class),
+                    record.getValue(BankTransaction.BANK_TRANSACTION.CATEGORY));
         }
 
-        if(hasGroupByPeriod) {
-            return new String(
-                    Base64.getEncoder().encode(String.valueOf(record.getValue("period")).getBytes(StandardCharsets.UTF_8)));
+        if (hasGroupByPeriod) {
+            return Cursor.forPeriod(String.valueOf(record.getValue("period")));
         }
 
-        if(hasGroupByColumn) {
-            return new String(
-                    Base64.getEncoder().encode(String.valueOf(record.getValue(BankTransaction.BANK_TRANSACTION.CATEGORY)).getBytes(StandardCharsets.UTF_8)));
+        if (hasGroupByColumn) {
+            return Cursor.forPeriod(String.valueOf(record.getValue(BankTransaction.BANK_TRANSACTION.CATEGORY)));
         }
 
-        return new String(
-            Base64.getEncoder().encode((record.getValue(BankTransaction.BANK_TRANSACTION.DATE) + "," + record.getValue(BankTransaction.BANK_TRANSACTION.ID)).getBytes(StandardCharsets.UTF_8)));
-
+        return Cursor.forPeriodAndColumn(
+                String.valueOf(record.getValue(BankTransaction.BANK_TRANSACTION.DATE)),
+                String.valueOf(record.getValue(BankTransaction.BANK_TRANSACTION.ID)));
     }
 
     // ========== Refactoring: Value Objects and Helper Classes ==========
@@ -369,8 +367,7 @@ public class TransactionStore extends Store implements TransactionRepository {
 
     static class PaginationHandler {
         String encodeCursor(String value) {
-            return Base64.getEncoder()
-                    .encodeToString(value.getBytes(StandardCharsets.UTF_8));
+            return Cursor.forId(Integer.parseInt(value));
         }
 
         <R extends Record> PagedResult<FinancialRecord> buildPagedResult(
