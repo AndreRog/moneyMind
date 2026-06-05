@@ -14,6 +14,10 @@ public class GetTransaction {
     }
 
     public FinancialRecord execute(String id) {
-        return this.transactionRepository.getById(UUID.fromString(id));
+        try {
+            return transactionRepository.getById(UUID.fromString(id));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }
