@@ -2,13 +2,11 @@ package com.moneymind.finance.infrastructure.postgres;
 
 import com.moneymind.finance.domain.PagedResult;
 import com.moneymind.finance.domain.core.AggregatedResult;
-import com.moneymind.finance.domain.core.Cursor;
 import com.moneymind.finance.domain.core.FinancialRecord;
 import com.moneymind.finance.domain.core.TransactionSearchQuery;
 import com.moneymind.finance.domain.ports.TransactionRepository;
 import org.jooq.DSLContext;
 import org.jooq.InsertValuesStep5;
-import org.jooq.Record;
 import org.jooq.Result;
 import org.jooq.exception.IntegrityConstraintViolationException;
 import org.jooq.generated.tables.BankTransaction;
@@ -123,27 +121,7 @@ public class TransactionStore extends Store implements TransactionRepository {
 
     @Override
     public PagedResult<FinancialRecord> fetchNoCategoriesTransaction(int limit, String cursor) {
-        int sanitizedLimit = this.sanitizeLimit(limit);
-        int sanitizedCursor = this.sanitizeCursor(cursor);
-
-        List<BankTransactionRecord> bankTransactionRecords = this.dataSource.selectFrom(BankTransaction.BANK_TRANSACTION)
-                .where(BankTransaction.BANK_TRANSACTION.CATEGORY.isNull())
-                .and(BankTransaction.BANK_TRANSACTION.ID.ge(sanitizedCursor))
-                .limit(sanitizedLimit + 1)
-                .fetchInto(BankTransactionRecord.class);
-
-        String newCursor = null;
-        boolean hasMoreRecords = !bankTransactionRecords.isEmpty() && bankTransactionRecords.size() >= sanitizedLimit + 1;
-        if (hasMoreRecords) {
-            BankTransactionRecord rec = bankTransactionRecords.removeLast();
-            newCursor = Cursor.forId(rec.getId());
-        }
-
-        return new PagedResult<>(
-                bankTransactionRecords.stream().map(TransactionStore::toModel).collect(Collectors.toList()),
-                sanitizedLimit,
-                newCursor
-        );
+        return txQuery.fetchNoCategoriesTransaction(limit, cursor);
     }
 
     @Override
