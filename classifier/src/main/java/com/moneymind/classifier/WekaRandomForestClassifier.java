@@ -87,10 +87,11 @@ public class WekaRandomForestClassifier implements Classifier {
             }
         }
 
-        // Calculate TF-IDF weights for top words, preserving insertion order for stable indexing
+        // Calculate TF-IDF weights for top words, preserving insertion order for stable indexing.
+        // Single-occurrence words are retained: in Portuguese banking data most merchants appear
+        // once or twice per statement, so they are exactly the discriminative signal we need.
         Map<String, Double> vocabulary = new LinkedHashMap<>();
         wordCount.entrySet().stream()
-                .filter(entry -> entry.getValue() > 1) // Filter rare words
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                 .limit(200) // Top 200 words
                 .forEach(entry -> {

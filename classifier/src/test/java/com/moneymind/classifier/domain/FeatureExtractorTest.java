@@ -91,6 +91,15 @@ class FeatureExtractorTest {
     }
 
     @Test
+    void tokens_stripsAccentsSoAccentedAndUnaccentedShareToken() {
+        // "FARMÁCIA" (U+00C1 = A-acute) should produce token "farmacia", same as plain "FARMACIA"
+        var withAccent = extractor.tokens("FARMÁCIA SANTA ANA");
+        var withoutAccent = extractor.tokens("FARMACIA SANTA ANA");
+        assertEquals(withoutAccent, withAccent);
+        assertTrue(withAccent.contains("farmacia"));
+    }
+
+    @Test
     void extract_maskedDescriptionStillYieldsUsableAmountAndPeriodFeatures() {
         Transaction masked = new Transaction(
                 "351 9******* transfer", "INCOME", new BigDecimal("1200.00"), LocalDate.of(2026, 1, 2));

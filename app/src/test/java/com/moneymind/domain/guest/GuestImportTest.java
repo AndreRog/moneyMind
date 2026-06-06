@@ -128,6 +128,48 @@ class GuestImportTest {
     }
 
     @Test
+    void unrecognisedCreditClassifiedAsIncomeDoesNotCorruptExpenseTotal() throws Exception {
+        // If an unrecognised credit (e.g. tax refund) lands in MISCELLANEOUS (EXPENSE type),
+        // SummaryEngine negates it → negative expense total and negative shares.
+        // The classifier must route credits to an INCOME-type category instead.
+        FinancialRecord refund = record("2026-05-10", "REEMBOLSO IRS 2024", new BigDecimal("320.00"));
+        FinancialRecord rent   = record("2026-05-02", "Renda",              new BigDecimal("-750.00"));
+
+        givenDetectedBank("CGD", refund, rent);
+        givenClassifications(
+                classified("INCOME", refund),   // credit classified as INCOME (correct)
+                classified("RENT",   rent));     // debit classified as RENT (correct)
+
+        MonthlyReview may = guestImport.execute(csv()).months().get(0);
+
+        assertTrue(may.income().compareTo(BigDecimal.ZERO) > 0, "income must be positive");
+        assertTrue(may.expense().compareTo(BigDecimal.ZERO) > 0, "expense must be positive");
+        may.categories().forEach(c ->
+                assertTrue(c.share() >= 0, "share must be non-negative for " + c.name()));
+    }
+
+    @Test
+    void parentCategoryNameResolvesCorrectly() throws Exception {
+        // Classifier outputs parent category names ("INCOME", "HOUSING") — from ClassificationRules —
+        // rather than subcategory names ("SALARY", "RENT"). The lookup must handle both.
+        FinancialRecord salary = record("2026-05-31", "VENCIMENTO MAIO", new BigDecimal("2600.00"));
+        FinancialRecord rent   = record("2026-05-02", "RENDA APARTAMENTO", new BigDecimal("-900.00"));
+
+        givenDetectedBank("CGD", salary, rent);
+        givenClassifications(classified("INCOME", salary), classified("HOUSING", rent));
+
+        MonthlyReview may = guestImport.execute(csv()).months().get(0);
+
+        assertAmount("2600.00", may.income());
+        assertAmount("900.00",  may.expense());
+        assertAmount("1700.00", may.savings());
+        assertTrue(may.categories().stream().anyMatch(c -> c.name().equals("HOUSING")),
+                "HOUSING expense category must appear in the breakdown");
+        assertTrue(may.categories().stream().noneMatch(c -> c.name().equals("INCOME")),
+                "INCOME category must be excluded from the expense breakdown");
+    }
+
+    @Test
     void throwsWhenNoRegisteredParserCanReadTheFile() throws Exception {
         Mockito.when(bankRegistry.listAvailable()).thenReturn(java.util.Set.of("CGD"));
         Mockito.when(bankRegistry.getParser("CGD")).thenReturn(parser);

@@ -1,6 +1,7 @@
 package com.moneymind.classifier.domain;
 
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -58,15 +59,19 @@ public final class FeatureExtractor {
     }
 
     /**
-     * Lowercase, strip non-alphanumerics, keep tokens longer than two characters. Null/empty/fully
-     * masked descriptions yield an empty set (the amount + period features still carry signal).
+     * Strip accents, lowercase, drop non-alphanumerics, keep tokens longer than two characters.
+     * Accent stripping means "FARMACIA" and "FARMACIA" (accented) share the same token, improving
+     * ML signal for Portuguese merchants. Null/empty/fully masked descriptions yield an empty set
+     * (the amount + period features still carry signal).
      */
     public Set<String> tokens(String description) {
         Set<String> tokens = new LinkedHashSet<>();
         if (description == null || description.isBlank()) {
             return tokens;
         }
-        String[] candidates = description.toLowerCase()
+        String stripped = Normalizer.normalize(description, Normalizer.Form.NFD)
+                .replaceAll("[\\u0300-\\u036f]", "");
+        String[] candidates = stripped.toLowerCase()
                 .replaceAll("[^a-z0-9\\s]", " ")
                 .split("\\s+");
         for (String candidate : candidates) {

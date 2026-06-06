@@ -1,6 +1,8 @@
 package com.moneymind.classifier.di;
 
+import com.moneymind.classifier.HybridClassifier;
 import com.moneymind.classifier.WekaRandomForestClassifier;
+import com.moneymind.classifier.domain.ClassificationRules;
 import com.moneymind.classifier.infrastructure.postgres.TransactionRepository;
 import com.moneymind.classifier.ports.Classifier;
 import com.moneymind.classifier.ports.TrainingDataService;
@@ -25,6 +27,7 @@ public class DI {
     @ApplicationScoped
     @Produces
     Classifier produceClassifier(final TrainingDataService trainingDataService) throws Exception {
-        return new WekaRandomForestClassifier(trainingDataService);
+        WekaRandomForestClassifier weka = new WekaRandomForestClassifier(trainingDataService);
+        return new HybridClassifier(new ClassificationRules(), weka);
     }
 }
