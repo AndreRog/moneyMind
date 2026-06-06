@@ -1,17 +1,16 @@
 package com.moneymind.finance.infrastructure.web.http;
 
-import com.moneymind.finance.domain.PagedResult;
-import com.moneymind.finance.domain.core.AggregatedResult;
 import com.moneymind.finance.domain.core.ClassifiedFinancialRecord;
 import com.moneymind.finance.domain.core.FinancialRecord;
+import com.moneymind.finance.domain.core.SearchResult;
 import com.moneymind.finance.domain.core.TransactionSearchQuery;
+import com.moneymind.finance.domain.transactions.ExportTransactions;
 import com.moneymind.finance.domain.transactions.GetTransaction;
 import com.moneymind.finance.domain.transactions.ImportTransactions;
 import com.moneymind.finance.domain.transactions.SearchTransactions;
 import com.moneymind.finance.domain.transactions.UpdateTransactions;
 import com.moneymind.finance.infrastructure.web.http.dto.UpdateCategoryRequest;
 import com.moneymind.finance.infrastructure.web.http.hateoas.Link;
-import com.opencsv.CSVWriter;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
@@ -19,9 +18,7 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import org.jboss.resteasy.reactive.RestForm;
 
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.StringWriter;
 import java.util.List;
 
 @Path("/transactions")
@@ -29,13 +26,16 @@ public class TransactionsResource {
 
     private final ImportTransactions importTransactions;
     private final SearchTransactions searchTransactions;
+    private final ExportTransactions exportTransactions;
     private final UpdateTransactions updateTransactions;
     private final GetTransaction getTransaction;
 
     public TransactionsResource(ImportTransactions importTransactions, SearchTransactions searchTransactions,
-                                UpdateTransactions updateTransactions, GetTransaction getTransaction) {
+                                ExportTransactions exportTransactions, UpdateTransactions updateTransactions,
+                                GetTransaction getTransaction) {
         this.importTransactions = importTransactions;
         this.searchTransactions = searchTransactions;
+        this.exportTransactions = exportTransactions;
         this.updateTransactions = updateTransactions;
         this.getTransaction = getTransaction;
     }
@@ -84,16 +84,12 @@ public class TransactionsResource {
                 .sort(sort)
                 .build();
 
-        boolean isAggregating = (aggregateByPeriod != null && !aggregateByPeriod.isEmpty())
-                || (aggregateByColumn != null && !aggregateByColumn.isEmpty());
+        SearchResult result = this.searchTransactions.execute(query);
 
-        if (isAggregating) {
-            PagedResult<AggregatedResult> result = this.searchTransactions.executeAggregated(query);
-            return Response.ok(new Page<>(Link.buildNextLink(result, uriInfo), result.list())).build();
-        }
-
-        PagedResult<FinancialRecord> result = this.searchTransactions.execute(query);
-        return Response.ok(new Page<>(Link.buildNextLink(result, uriInfo), result.list())).build();
+        return switch (result) {
+            case SearchResult.Records r -> Response.ok(new Page<>(Link.buildNextLink(r.result(), uriInfo), r.result().list())).build();
+            case SearchResult.Aggregated a -> Response.ok(new Page<>(Link.buildNextLink(a.result(), uriInfo), a.result().list())).build();
+        };
     }
 
     @GET
@@ -122,31 +118,8 @@ public class TransactionsResource {
     @GET
     @Path("/export")
     public Response exportTransactions() {
-        TransactionSearchQuery query = TransactionSearchQuery.builder()
-                .limit(10000)
-                .build();
-
-        List<FinancialRecord> transactions = this.searchTransactions.execute(query).list();
-
-        StringWriter stringWriter = new StringWriter();
-        try (CSVWriter csvWriter = new CSVWriter(stringWriter)) {
-            csvWriter.writeNext(new String[]{"ID", "Bank", "Date", "Description", "Amount", "Balance", "Category"});
-            for (FinancialRecord record : transactions) {
-                csvWriter.writeNext(new String[]{
-                        record.getId(),
-                        record.getBankName(),
-                        record.getDate() != null ? record.getDate().toString() : "",
-                        record.getDescription(),
-                        record.getAmount() != null ? record.getAmount().toString() : "",
-                        record.getFinalBalance() != null ? record.getFinalBalance().toString() : "",
-                        record.getCategory()
-                });
-            }
-        } catch (IOException e) {
-            return Response.serverError().entity("Error generating CSV: " + e.getMessage()).build();
-        }
-
-        return Response.ok(stringWriter.toString())
+        String csv = this.exportTransactions.execute();
+        return Response.ok(csv)
                 .header("Content-Disposition", "attachment; filename=\"transactions.csv\"")
                 .type("text/csv")
                 .build();
