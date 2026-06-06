@@ -36,6 +36,28 @@ class TransactionQuery extends Store {
 
     // ─── public API ───────────────────────────────────────────────────────────
 
+    PagedResult<FinancialRecord> fetchNoCategoriesTransaction(int limit, String cursor) {
+        int sanitizedLimit = sanitizeLimit(limit);
+        int sanitizedCursor = sanitizeCursor(cursor);
+
+        List<BankTransactionRecord> records = dsl.selectFrom(BankTransaction.BANK_TRANSACTION)
+                .where(BankTransaction.BANK_TRANSACTION.CATEGORY.isNull())
+                .and(BankTransaction.BANK_TRANSACTION.ID.ge(sanitizedCursor))
+                .limit(sanitizedLimit + 1)
+                .fetchInto(BankTransactionRecord.class);
+
+        String newCursor = null;
+        if (!records.isEmpty() && records.size() >= sanitizedLimit + 1) {
+            newCursor = Cursor.forId(records.removeLast().getId());
+        }
+
+        return new PagedResult<>(
+                records.stream().map(TransactionStore::toModel).collect(Collectors.toList()),
+                sanitizedLimit,
+                newCursor
+        );
+    }
+
     PagedResult<FinancialRecord> search(TransactionSearchQuery query) {
         int limit = sanitizeLimit(query.limit());
         Result<BankTransactionRecord> results = buildSearchSelect(query).fetch();
