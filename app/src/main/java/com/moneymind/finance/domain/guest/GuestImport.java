@@ -132,14 +132,16 @@ public class GuestImport {
     }
 
     private Map<String, Resolved> resolveCategoryTypes() {
-        final Map<String, Resolved> bySubcategory = new LinkedHashMap<>();
+        final Map<String, Resolved> byName = new LinkedHashMap<>();
         // null userId → system/global categories (not user-scoped)
         for (Category category : categoryRepository.findCategories(null)) {
+            // Parent category entry so classifier outputs like "INCOME" or "HOUSING" resolve correctly
+            byName.put(category.name(), new Resolved(category.name(), category.type()));
             for (Category sub : category.subcategories()) {
-                bySubcategory.put(sub.name(), new Resolved(category.name(), sub.type()));
+                byName.put(sub.name(), new Resolved(category.name(), sub.type()));
             }
         }
-        return bySubcategory;
+        return byName;
     }
 
     private static String period(final ClassifiedFinancialRecord record) {
