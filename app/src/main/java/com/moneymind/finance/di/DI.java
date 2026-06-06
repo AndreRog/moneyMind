@@ -122,8 +122,7 @@ public class DI {
 
     @ApplicationScoped
     @Produces
-    TransactionClassifier transactionClassifier(final Classifier classifier,
-                                                final TransactionRepository transactionRepository) {
-        return new ClassificationEngine(classifier, transactionRepository);
+    TransactionClassifier transactionClassifier(final Classifier classifier) {
+        return new ClassificationEngine(classifier);
     }
 }

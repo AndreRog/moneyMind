@@ -32,5 +32,15 @@ public class FinancialRecordTestFactory {
         );
     }
 
-
+    public static FinancialRecord createUncategorisedRecord() {
+        return new FinancialRecord(
+                UUID.randomUUID().toString(),
+                "RANDOM",
+                OffsetDateTime.now(),
+                "Random text",
+                BigDecimal.valueOf(10.0),
+                BigDecimal.valueOf(10.0),
+                null
+        );
+    }
 }
