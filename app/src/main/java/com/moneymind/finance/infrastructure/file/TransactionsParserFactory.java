@@ -12,14 +12,9 @@ import java.util.Set;
 
 public class TransactionsParserFactory implements BankRegistry {
 
-    // Map[BankType, TransactionsParser]
     private final Map<String, TransactionsParser> transactionsParser = new HashMap<>();
+    private final Map<String, String> bankCountry = new HashMap<>();
 
-    /**
-     * Simply injecting the parser in the CDI is enough to be discovered. Makes it easier to extend the application.
-     *
-     * @param availableParsers the parsers present in the cdi.
-     */
     public TransactionsParserFactory(@Any Instance<TransactionsParser> availableParsers) {
         for (TransactionsParser parser : availableParsers) {
             BankType bankTypeAnnotation = parser.getClass().getSuperclass().getAnnotation(BankType.class);
@@ -27,12 +22,15 @@ public class TransactionsParserFactory implements BankRegistry {
             if (bankTypeAnnotation == null) {
                 throw new IllegalStateException("TransactionsParser " + parser.getClass().getName() + " is missing @BankType annotation");
             }
-
             if (bankTypeAnnotation.value().isBlank()) {
-                throw new IllegalStateException("TransactionsParser " + parser.getClass().getName() + " @BankType annotation is blank");
+                throw new IllegalStateException("TransactionsParser " + parser.getClass().getName() + " @BankType value is blank");
+            }
+            if (bankTypeAnnotation.country().isBlank()) {
+                throw new IllegalStateException("TransactionsParser " + parser.getClass().getName() + " @BankType country is blank — every parser must declare a country");
             }
 
             transactionsParser.put(bankTypeAnnotation.value(), parser);
+            bankCountry.put(bankTypeAnnotation.value(), bankTypeAnnotation.country());
         }
     }
 
@@ -44,5 +42,10 @@ public class TransactionsParserFactory implements BankRegistry {
     @Override
     public Set<String> listAvailable() {
         return transactionsParser.keySet();
+    }
+
+    @Override
+    public String countryOf(String bankType) {
+        return bankCountry.getOrDefault(bankType, "");
     }
 }

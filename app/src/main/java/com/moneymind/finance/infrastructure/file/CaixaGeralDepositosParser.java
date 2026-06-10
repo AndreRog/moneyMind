@@ -15,7 +15,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -23,14 +22,23 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @ApplicationScoped
-@BankType("CAIXAGERALDEPOSITOS")
+@BankType(value = "CAIXAGERALDEPOSITOS", country = "PT")
 public class CaixaGeralDepositosParser implements TransactionsParser {
 
     private static final Logger logger = LoggerFactory.getLogger(CaixaGeralDepositosParser.class);
+
+    // Maps unambiguous CGD Categoria labels to system categories.
+    // Broad labels (COMPRAS, LEVANTAMENTOS, Diversos) are intentionally absent so rules/ML
+    // classify those transactions by merchant description instead.
+    private static final Map<String, String> CGD_CATEGORY_MAP = Map.of(
+        "AGUA",     "WATER",
+        "SEGUROS",  "HOUSING",
+        "DEPOSITO", "INCOME"
+    );
 
     @Override
     public List<FinancialRecord> parse(InputStream input) throws IOException {
@@ -61,13 +69,17 @@ public class CaixaGeralDepositosParser implements TransactionsParser {
                 }
                 String description = row[2];
                 double finalBalance = Double.parseDouble(row[5].replace(".", "").replace(",", "."));
+                String bankCategory = row.length > 7 ? row[7].strip() : "";
+                String category = CGD_CATEGORY_MAP.getOrDefault(bankCategory.toUpperCase(), "UNCATEGORIZED");
 
                 financialRecords.add(new FinancialRecord(
+                        null,
                         bankTypeAnnotation.value(),
                         transactionDate,
                         description,
                         BigDecimal.valueOf(valueSpent),
-                        BigDecimal.valueOf(finalBalance)
+                        BigDecimal.valueOf(finalBalance),
+                        category
                 ));
             }
         } catch (Exception ex) {

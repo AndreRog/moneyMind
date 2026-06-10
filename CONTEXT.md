@@ -1,3 +1,4 @@
+
 # Finance
 
 The MoneyMind backend bounded context: it ingests bank transaction files, classifies each transaction into a category, persists them, and serves search, aggregation, and review over them. Hexagonal architecture — domain owns the ports, infrastructure provides the adapters.
@@ -58,6 +59,14 @@ _Avoid_: tag, label, bucket.
 The role a category plays in a summary — `INCOME`, `EXPENSE`, or `EXCLUDED`.
 _Avoid_: kind, classification.
 
+**Merchant Directory**:
+A global, language-independent mapping from a normalised merchant identifier to a category. The classification backbone for card-purchase lines; matched regardless of the statement's country, so a foreign merchant on a domestic statement still resolves (a Carrefour charge on a Portuguese statement → FOOD). The ML model classifies only what the directory and the rule packs leave unmatched (the long tail).
+_Avoid_: rule list, keyword map, lookup table.
+
+**Rule Pack**:
+A per-country set of keyword rules covering only **bank-generated generic lines** — rent, salary, transfers, fees, interest — which a bank always writes in its own language. Selected by the detected bank's country, never the cardholder's location, so a traveller's statement still resolves its generic lines correctly. Merchant lines are not its concern; those go through the Merchant Directory.
+_Avoid_: ruleset, locale rules, language rules.
+
 ### Guest review
 
 **GuestImport**:
@@ -77,5 +86,5 @@ _Avoid_: aggregator, calculator, stats.
 ### Banks
 
 **BankRegistry / TransactionsParser**:
-The port that lists available banks and yields a `TransactionsParser` per bank; each parser turns a bank's CSV/XLS into `FinancialRecord`s.
+The port that lists available banks and yields a `TransactionsParser` per bank; each parser turns a bank's CSV/XLS into `FinancialRecord`s. Each bank declares its **country**, which is the single source of a transaction's locale for classification (it selects the Rule Pack).
 _Avoid_: importer, reader, loader.

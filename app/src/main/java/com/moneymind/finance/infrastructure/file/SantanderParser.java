@@ -29,7 +29,7 @@ import java.util.List;
  * Data mov. ;Data valor ;Descrição ;Débito ;Crédito ;Saldo contabilístico ;Saldo disponível ;Categoria ;
  */
 @ApplicationScoped
-@BankType("SANTANDER")
+@BankType(value = "SANTANDER", country = "PT")
 public class SantanderParser implements TransactionsParser {
 
     private static final Logger logger = LoggerFactory.getLogger(SantanderParser.class);

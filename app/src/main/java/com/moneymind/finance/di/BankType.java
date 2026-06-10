@@ -12,4 +12,6 @@ import java.lang.annotation.Target;
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.METHOD, ElementType.TYPE})
 public @interface BankType {
     String value();
+    /** ISO 3166-1 alpha-2 country code (e.g. "PT"). Selects the Rule Pack for generic bank lines. */
+    String country();
 }
